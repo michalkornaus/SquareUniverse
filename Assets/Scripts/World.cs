@@ -4,7 +4,7 @@ public class World
 {
     public Dictionary<ChunkId, Chunk> Chunks = new Dictionary<ChunkId, Chunk>();
     public Dictionary<HeightmapId, Heightmap> Heightmap = new Dictionary<HeightmapId, Heightmap>();
-    public int this[int x, int y, int z]
+    public byte this[int x, int y, int z]
     {
         get
         {
@@ -18,50 +18,38 @@ public class World
         set
         {
             var chunk = Chunks[ChunkId.FromWorldPos(x, z)];
-            chunk.saveable = true;
+            var heightmap = Heightmap[HeightmapId.FromWorldPos(x, z)];
+            heightmap[x & 0x7F, y, z & 0x7F] = value;
             chunk[x & 0xF, y, z & 0xF] = value;
+            heightmap.SaveData();
         }
     }
-    /*
-    public ushort this[int x, int y, int z, bool heightmap]
-    {
-        get
-        {
-            if (Heightmap.TryGetValue(HeightmapId.FromWorldPos(x, z), out Heightmap hm))
-            {
-                return hm[x, y, z];
-            }
-            else
-                return 3;
-        }
-        set
-        {
-            var hm = Heightmap[HeightmapId.FromWorldPos(x, z)];
-            hm[x & 0x4, y, z & 0x4] = value;
-        }
-    }*/
     public void SetChunkDirty(int x, int z, bool newChunk)
     {
         var chunk = Chunks[ChunkId.FromWorldPos(x, z)];
-        chunk.isUpdatable = true;
-        chunk.isDirty = true;
+        //chunk.isDirty = true;
+        chunk.StartCoroutine(chunk.UpdateMesh());
         if (newChunk)
         {
-            if (Chunks.TryGetValue(ChunkId.FromWorldPos(x-1, z+1), out Chunk _chunk))
+            if (Chunks.TryGetValue(ChunkId.FromWorldPos(x - 1, z + 1), out Chunk _chunk))
             {
-                _chunk.isDirty = true;
+                //_chunk.isDirty = true;
+                _chunk.StartCoroutine(_chunk.UpdateMesh());
             }
-            if (Chunks.TryGetValue(ChunkId.FromWorldPos(x+1, z-1), out _chunk))
+            if (Chunks.TryGetValue(ChunkId.FromWorldPos(x + 1, z - 1), out _chunk))
             {
-                _chunk.isDirty = true;
+                //_chunk.isDirty = true;
+                _chunk.StartCoroutine(_chunk.UpdateMesh());
             }
-            if (Chunks.TryGetValue(ChunkId.FromWorldPos(x+17, z+1), out _chunk))
+            if (Chunks.TryGetValue(ChunkId.FromWorldPos(x + 17, z + 1), out _chunk))
             {
-                _chunk.isDirty = true;
+                //_chunk.isDirty = true;
+                _chunk.StartCoroutine(_chunk.UpdateMesh());
             }
             if (Chunks.TryGetValue(ChunkId.FromWorldPos(x + 1, z + 17), out _chunk))
             {
-                _chunk.isDirty = true;
+                //_chunk.isDirty = true;
+                _chunk.StartCoroutine(_chunk.UpdateMesh());
             }
         }
         else
@@ -72,16 +60,36 @@ public class World
             {
                 if (Chunks.TryGetValue(ChunkId.FromWorldPos(x - (_x == 0 ? 1 : -1), z), out Chunk _chunk))
                 {
-                    _chunk.isDirty = true;
+                    //_chunk.isDirty = true;
+                    _chunk.StartCoroutine(_chunk.UpdateMesh());
                 }
             }
             if (_z == 0 || _z == 15)
             {
                 if (Chunks.TryGetValue(ChunkId.FromWorldPos(x, z - (_z == 0 ? 1 : -1)), out Chunk _chunk))
                 {
-                    _chunk.isDirty = true;
+                    //_chunk.isDirty = true;
+                    _chunk.StartCoroutine(_chunk.UpdateMesh());
                 }
             }
         }
     }
+    /*
+public ushort this[int x, int y, int z, bool heightmap]
+{
+    get
+    {
+        if (Heightmap.TryGetValue(HeightmapId.FromWorldPos(x, z), out Heightmap hm))
+        {
+            return hm[x, y, z];
+        }
+        else
+            return 3;
+    }
+    set
+    {
+        var hm = Heightmap[HeightmapId.FromWorldPos(x, z)];
+        hm[x & 0x4, y, z & 0x4] = value;
+    }
+}*/
 }

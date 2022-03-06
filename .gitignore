@@ -3,9 +3,10 @@
 [Oo]bj/
 [Bb]uild/
 [Bb]uilds/
-[Ll]ogs/
-Assets/AssetStoreTools*
 
+Assets/AssetStoreTools*
+UIElementsSchema/
+Logs/
 # Visual Studio cache directory
 .vs/
 

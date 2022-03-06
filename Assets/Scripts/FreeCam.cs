@@ -4,55 +4,23 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
-/// <summary>
-/// A simple free camera to be added to a Unity game object.
-/// 
-/// Keys:
-///	wasd / arrows	- movement
-///	q/e 			- up/down (local space)
-///	r/f 			- up/down (world space)
-///	pageup/pagedown	- up/down (world space)
-///	hold shift		- enable fast movement mode
-///	right mouse  	- enable free look
-///	mouse			- free look / rotation
-///     
-/// </summary>
 public class FreeCam : MonoBehaviour
 {
-    /// <summary>
-    /// Normal speed of camera movement.
-    /// </summary>
     public float movementSpeed = 10f;
-
-    /// <summary>
-    /// Speed of camera movement when shift is held down,
-    /// </summary>
     public float fastMovementSpeed = 100f;
-
-    /// <summary>
-    /// Sensitivity for free look.
-    /// </summary>
     public float freeLookSensitivity = 3f;
-
-    /// <summary>
-    /// Amount to zoom the camera when using the mouse wheel.
-    /// </summary>
     public float zoomSensitivity = 10f;
-
-    /// <summary>
-    /// Amount to zoom the camera when using the mouse wheel (fast mode).
-    /// </summary>
     public float fastZoomSensitivity = 50f;
-
-    /// <summary>
-    /// Set to true when free looking (on right mouse button).
-    /// </summary>
     private bool looking = false;
+    private void Start()
+    {
+        StartLooking();
+    }
 
     void Update()
     {
         var fastMode = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-        var movementSpeed = fastMode ? this.fastMovementSpeed : this.movementSpeed;
+        var movementSpeed = fastMode ? fastMovementSpeed : this.movementSpeed;
 
         if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
         {
@@ -104,7 +72,7 @@ public class FreeCam : MonoBehaviour
         float axis = Input.GetAxis("Mouse ScrollWheel");
         if (axis != 0)
         {
-            var zoomSensitivity = fastMode ? this.fastZoomSensitivity : this.zoomSensitivity;
+            var zoomSensitivity = fastMode ? fastZoomSensitivity : this.zoomSensitivity;
             transform.position = transform.position + transform.forward * axis * zoomSensitivity;
         }
 
@@ -123,9 +91,6 @@ public class FreeCam : MonoBehaviour
         StopLooking();
     }
 
-    /// <summary>
-    /// Enable free looking.
-    /// </summary>
     public void StartLooking()
     {
         looking = true;
@@ -133,9 +98,6 @@ public class FreeCam : MonoBehaviour
         Cursor.lockState = CursorLockMode.Locked;
     }
 
-    /// <summary>
-    /// Disable free looking.
-    /// </summary>
     public void StopLooking()
     {
         looking = false;

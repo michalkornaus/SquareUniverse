@@ -11,19 +11,15 @@ public class Chunk : MonoBehaviour
     public static int chunkSize = 16;
     public static int chunkHeight = chunkSize * 8;
 
-    public int[] Cubes = new int[chunkHeight * chunkSize * chunkSize];
-    public int this[int x, int y, int z]
+    public byte[] Cubes = new byte[chunkHeight * chunkSize * chunkSize];
+    public byte this[int x, int y, int z]
     {
         get { return Cubes[x * chunkHeight * chunkSize + y * chunkSize + z]; }
         set { Cubes[x * chunkHeight * chunkSize + y * chunkSize + z] = value; }
     }
-
-    public bool isDirty = false;
-    public bool isUpdatable = false;
-    public bool saveable = false;
+    //public bool isDirty = false;
 
     //COMPONENTS
-    private System.Random _random = new System.Random();
     private Material[] materials = new Material[2];
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
@@ -60,7 +56,6 @@ public class Chunk : MonoBehaviour
     void Awake()
     {
         _voxelEngine = GetComponentInParent<VoxelEngine>();
-        StartCoroutine(WaitForHeight());
         _c = new Vector3[]
         {
           new Vector3 (0, 0, cubeSize),
@@ -111,7 +106,7 @@ public class Chunk : MonoBehaviour
 	        up, up, up, up                      // Top
        };
     }
-    void Start()
+    private void Start()
     {
         materials[0] = _voxelEngine.opaqueMat;
         materials[1] = _voxelEngine.transparentMat;
@@ -120,36 +115,19 @@ public class Chunk : MonoBehaviour
         _meshRenderer = GetComponent<MeshRenderer>();
         _meshCollider = GetComponent<MeshCollider>();
         _meshRenderer.materials = materials;
-        _meshRenderer.receiveGI = ReceiveGI.Lightmaps;
         _meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
+        StartCoroutine(WaitForHeight());
     }
 
-    void Update()
+    /*private void Update()
     {
-        //if (isUpdatable)
-        //    StartCoroutine(WaitForUpdateBlocks());
         if (isDirty)
             RenderToMesh();
-    }
-    private IEnumerator WaitForUpdateBlocks()
+    }*/
+    public IEnumerator UpdateMesh()
     {
-        isUpdatable = false;
-        for (var x = 0; x < chunkSize; x++)
-        {
-            for (var y = 0; y < chunkHeight; y++)
-            {
-                for (var z = 0; z < chunkSize; z++)
-                {
-                    if (this[x, y, z] != 7)
-                        continue;
-                    if (this[x, y - 1, z] == 0)
-                        this[x, y - 1, z] = 7;
-
-                }
-            }
-        }
-        yield return new WaitForSecondsRealtime(1f);
-        isUpdatable = true;
+        yield return new WaitForEndOfFrame();
+        RenderToMesh();
     }
     private IEnumerator WaitForHeight()
     {
@@ -163,31 +141,16 @@ public class Chunk : MonoBehaviour
             if (posZ < 0)
                 posZ = (int)RoundUp(Mathf.Abs(posZ), 128) + posZ;
             Cubes = hm.ReturnCubes(posX % 128, posZ % 128);
-            isUpdatable = true;
-            /*for (int x = 0; x < chunkSize; x++)
-            {
-                for (int z = 0; z < chunkSize; z++)
-                {
-                    for (int y = 0; y < chunkHeight; y++)
-                    {
-                        //x 0:15 z 0:15 y 0:127
-                        //.world[15+posX, 127, 15+posZ]
-                        //this[x, y, z] = hm.ReturnCubes();
-                    }
-                }
-            }*/
         }
         else
         {
             yield return new WaitForEndOfFrame();
             StartCoroutine(WaitForHeight());
         }
-
     }
-
     private void RenderToMesh()
     {
-        isDirty = false;
+        //isDirty = false;
         var vertices = new List<Vector3>();
         var opaqueTriangles = new List<int>();
         var transparentTriangles = new List<int>();
@@ -303,7 +266,7 @@ public class Chunk : MonoBehaviour
         //Bottom
         if (y > 0)
         {
-            if (this[x, y - 1, z] == 0 || this[x, y - 1, z] == 7)
+            if (this[x, y - 1, z] == 0 || this[x, y - 1, z] == 7)// || this[x, y - 1, z] == 6)
             {
                 if (this[x, y, z] == 7)
                 {
@@ -312,6 +275,7 @@ public class Chunk : MonoBehaviour
                         triangles.AddRange(BottomQuad);
                     }
                 }
+                //else if(this[x,y,z])
                 else
                 {
                     triangles.AddRange(BottomQuad);

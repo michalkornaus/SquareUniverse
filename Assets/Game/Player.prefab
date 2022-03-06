@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 4652611952530368326}
   - component: {fileID: 4652611952530368327}
   - component: {fileID: 4652611952530368329}
+  - component: {fileID: 1008273813}
   m_Layer: 9
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -185,6 +186,23 @@ Behaviour:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4652611952530368321}
   m_Enabled: 1
+--- !u!114 &1008273813
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4652611952530368321}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 167d78ed6124d0e46bf656ad11c0ecb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  movementSpeed: 10
+  fastMovementSpeed: 100
+  freeLookSensitivity: 3
+  zoomSensitivity: 10
+  fastZoomSensitivity: 50
 --- !u!1 &4652611953745217035
 GameObject:
   m_ObjectHideFlags: 0
@@ -211,7 +229,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4652611953745217035}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 100, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
@@ -228,7 +246,7 @@ CharacterController:
   m_GameObject: {fileID: 4652611953745217035}
   m_Material: {fileID: 0}
   m_IsTrigger: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_Height: 1.75
   m_Radius: 0.4
@@ -244,7 +262,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4652611953745217035}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 881573125b6b3634e89242ab87bb6286, type: 3}
   m_Name: 
@@ -257,11 +275,6 @@ MonoBehaviour:
   pushForce: 2
   staminaReg: 0.2
   staminaDrain: 0.4
-  audioSourc: {fileID: 4652611953745217136}
-  defaultSteps: []
-  carpetSteps: []
-  metalSteps: []
-  woodSteps: []
   frequency: 16
   amplitude: 0.005
 --- !u!82 &4652611953745217136
@@ -271,7 +284,7 @@ AudioSource:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4652611953745217035}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}

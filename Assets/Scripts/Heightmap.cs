@@ -1,54 +1,114 @@
 ﻿using UnityEngine;
 using TinkerWorX.AccidentalNoiseLibrary;
+using System.IO;
 
 public class Heightmap
 {
-    private static ImplicitFractal HeightNoise = new ImplicitFractal(FractalType.HybridMulti, BasisType.Simplex, InterpolationType.Quintic)
-    { Octaves = 6, Frequency = 0.93, Lacunarity = 0.7, Gain = 0.3 };
-    private static ImplicitFractal CaveNoise = new ImplicitFractal(FractalType.RidgedMulti, BasisType.Gradient, InterpolationType.Quintic)
+    private static readonly ImplicitFractal HeightNoise = new ImplicitFractal(FractalType.RidgedMulti, BasisType.Simplex, InterpolationType.Quintic)
+    { Octaves = 4, Frequency = 0.2 };
+    private static readonly ImplicitFractal BaseHNoise = new ImplicitFractal(FractalType.HybridMulti, BasisType.GradientValue, InterpolationType.Linear)
+    { Octaves = 2, Frequency = 0.3 };
+    private static readonly ImplicitFractal CaveNoise = new ImplicitFractal(FractalType.RidgedMulti, BasisType.Gradient, InterpolationType.Quintic)
     { Octaves = 1, Frequency = 2 };
-    private static readonly int biomsCount = 5;
+    private static readonly ImplicitFractal TreeNoise = new ImplicitFractal(FractalType.Billow, BasisType.Value, InterpolationType.Linear)
+    { Frequency = 4 };
+    private static readonly ImplicitFractal BiomNoise = new ImplicitFractal(FractalType.FractionalBrownianMotion, BasisType.GradientValue, InterpolationType.Cubic)
+    { Octaves = 8, Frequency = 0.25 };
+
+    private static readonly ImplicitFractal GrassLandsNoise = new ImplicitFractal(FractalType.HybridMulti, BasisType.Gradient, InterpolationType.Cubic)
+    { Octaves = 4, Frequency = 0.12 };
+    private static readonly ImplicitFractal DesertNoise = new ImplicitFractal(FractalType.Billow, BasisType.Gradient, InterpolationType.Cubic)
+    { Octaves = 3, Frequency = 0.16 };
+    private static readonly ImplicitFractal HillsNoise = new ImplicitFractal(FractalType.FractionalBrownianMotion, BasisType.Gradient, InterpolationType.Cubic)
+    { Octaves = 4, Frequency = 0.20 };
+    private static readonly ImplicitFractal WaterNoise = new ImplicitFractal(FractalType.RidgedMulti, BasisType.Gradient, InterpolationType.Cubic)
+    { Octaves = 2, Frequency = 0.08 };
     private static readonly int chunkSize = 16;
     private static readonly int heightmapSize = chunkSize * 8;
     private static readonly int chunkHeight = chunkSize * 8;
     private Vector2 position;
-    private HeightmapValues heightmapValues;
-    public Material NoiseShader;
+
     //Cubes - Max 2 097 152
-    public int[] Cubes = new int[128 * 16 * 16 * 64];
+    public byte[] Cubes = new byte[128 * 16 * 16 * 64];
 
     //CubesBioms - Max 16384
-    public int[] CubesBioms = new int[16 * 16 * 64];
+    public byte[] CubesBioms = new byte[16 * 16 * 64];
     public Heightmap(int x, int z)
     {
         //x - 0, 128, -128... : z - 0, 128, -128...
-        HeightNoise.Seed = (int)VoxelEngine.WorldSeed;
-        //CaveNoise.Seed = (int)VoxelEngine.WorldSeed;
-        //GenerateBioms(x, z);
-        GenerateHeight(x, z);
-        SetHeight(x, z);
+        SetSeeds();
+        if (!LoadData(x, z))
+        {
+            GenerateBioms(x, z);
+            GenerateHeight(x, z);
+            _SaveData(x, z);
+        }
         position = new Vector2(x, z);
+    }
+    private bool LoadData(int x, int z)
+    {
+        string name = x.ToString() + "_" + z.ToString();
+        //string dest = Application.persistentDataPath + "_" + "save_" + name + ".dat";
+        string dest = Application.persistentDataPath + "/" + (int)VoxelEngine.WorldSeed + "/" + "region_" + name + ".dat";
+        if (File.Exists(dest))
+        {
+            var br = new BinaryReader(File.OpenRead(dest));
+            Cubes = br.ReadBytes(2097152);
+            br.Close();
+            return true;
+        }
+        else
+            return false;
+    }
+    private void _SaveData(int x, int z)
+    {
+        string name = x.ToString() + "_" + z.ToString();
+        //string dest = Application.persistentDataPath + "_" + "save_" + name + ".dat";
+        string dest = Application.persistentDataPath + "/" + (int)VoxelEngine.WorldSeed + "/" + "region_" + name + ".dat";
+        string dir = Application.persistentDataPath + "/" + (int)VoxelEngine.WorldSeed;
+        if (!Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+        var bw = new BinaryWriter(File.Open(dest, FileMode.OpenOrCreate));
+        bw.Write(Cubes);
+        bw.Flush();
+        bw.Close();
+    }
+    public void SaveData()
+    {
+        string name = position.x.ToString() + "_" + position.y.ToString();
+        string dest = Application.persistentDataPath + "/" + (int)VoxelEngine.WorldSeed + "/" + "region_" + name + ".dat";
+        string dir = Application.persistentDataPath + "/" + (int)VoxelEngine.WorldSeed;
+        if (!Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+        var bw = new BinaryWriter(File.Open(dest, FileMode.OpenOrCreate));
+        bw.Write(Cubes);
+        bw.Flush();
+        bw.Close();
     }
     public Vector2 GetPosition()
     {
         return position;
     }
-    public int this[int x, int y, int z]
+    public byte this[int x, int y, int z]
     {
         //x - 2 080 768   y -     z - 127
         get { return Cubes[x * 128 * 128 + y * 128 + z]; }
         //x 2 080 768 + y 16256 z + 127 = 2 097 151
         set { Cubes[x * 128 * 128 + y * 128 + z] = value; }
     }
-    public int this[int x, int z]
+    public byte this[int x, int z]
     {
         get { return CubesBioms[x * heightmapSize + z]; }
         set { CubesBioms[x * heightmapSize + z] = value; }
     }
 
-    public int[] ReturnCubes(int posX, int posZ)
+    public byte[] ReturnCubes(int posX, int posZ)
     {
-        int[] p = new int[128 * 16 * 16];
+        byte[] p = new byte[128 * 16 * 16];
         for (int x = 0; x < chunkSize; x++)
         {
             for (int z = 0; z < chunkSize; z++)
@@ -63,239 +123,154 @@ public class Heightmap
     }
     private void GenerateBioms(int _x, int _z)
     {
-        int posX = _x + (int)VoxelEngine.WorldSeed;
-        int posZ = _z + (int)VoxelEngine.WorldSeed;
-        for (int x = 0; x < heightmapSize; x++)
-        {
-            for (int z = 0; z < heightmapSize; z++)
-            {
-                this[x, z] = CalcBiom(x + posX, z + posZ);
-            }
-        }
-    }
-    private int CalcBiom(int x, int z)
-    {
-        int value = ((Noise.PerlinNoise(x, 45, z, 9, 1, 1.1f) + Noise.PerlinNoise(x, 10, z, 15, 3, 0.9f)) * 5) % biomsCount;
-        return value;
-    }
-    /*
-    private int CalcStoneLevel(int x, int z, int _x, int _z, int biom)
-    {
-        //x - 0, 128, -128... : z - 0, 128, -128...
-        //_x - 0:127 _z 0:127
-        int xOffset = 0, zOffset = 0;
-        if (_x == 0 || _x == 127)
-        {
-            if (_x == 0)
-            {
-                if (CalcBiom(x - 1, z) != biom)
-                { xOffset = -1; }
-            }
-            else if (_x == 127)
-            {
-                if (CalcBiom(x + 1, z) != biom)
-                { xOffset = 1; }
-            }
-        }
-        else
-        {
-            if (this[_x - 1, _z] != biom)
-            { xOffset = -1; }
-            else if (this[_x + 1, _z] != biom)
-            { xOffset = 1; }
-        }
-        if (_z == 0 || _z == 127)
-        {
-            if (_z == 0)
-            {
-                if (CalcBiom(x, z - 1) != biom)
-                { zOffset = -1; }
-            }
-            else if (_z == 127)
-            {
-                if (CalcBiom(x, z + 1) != biom)
-                { zOffset = 1; }
-            }
-        }
-        else
-        {
-            if (this[_x, _z - 1] != biom)
-            { zOffset = -1; }
-            else if (this[_x, _z + 1] != biom)
-            { zOffset = 1; }
-        }
-        if (xOffset == 0 && zOffset == 0)
-            return GetStoneNoise(x, z, biom);
-        else
-        {
-            return (GetStoneNoise(x, z, biom) + GetStoneNoise(x + xOffset, z + zOffset, CalcBiom(x+xOffset, z+zOffset)))/2;
-        }
-    }
-    private int GetStoneNoise(int x, int z, int biom)
-    {
-        switch (biom)
-        {
-            //PLAINS
-            case 0:
-                return Noise.PerlinNoise(x, 35, z, 10, 5, 0.6f) + 20;
-            //HILLS
-            case 1:
-                return Noise.PerlinNoise(x, 75, z, 15, 3, 1.1f) + 35;
-            //DESERT
-            case 2:
-                return Noise.PerlinNoise(x, 50, z, 40, 10, 1.2f) + 30;
-            //OTHER BIOMS
-            default:
-                return Noise.PerlinNoise(x, 35, z, 10, 5, 0.6f);
-        }
-    }
-    */
-    private int CalcGroundLevel(int x, int z, int biom)
-    {
-        switch (biom)
-        {
-            //PLAINS
-            case 0:
-                return Noise.PerlinNoise(x, 15, z, 12, 10, 1.4f) + 2;
-            //HILLS
-            case 1:
-                return Noise.PerlinNoise(x, 50, z, 50, 3, 0.6f) + 2;
-            //DESERT
-            case 2:
-                return Noise.PerlinNoise(x, 15, z, 12, 5, 1.4f) + 2;
-            //OTHER BIOMS
-            default:
-                return Noise.PerlinNoise(x, 35, z, 10, 5, 0.6f) + 2;
-        }
-    }
-
-    /*
-    private void CalculateHeightMap(int _x, int _z)
-    {
-        double posX = _x / 128;
-        double posZ = _z / 128;
-        // 0001 0010 0011 0100 0101 0110 0111 1000 1001 1010 1011 1100 1101 1110 1111
-        ImplicitGradient gradient = new ImplicitGradient(0, 0, 0, 1)
-        {
-            Seed = (int)VoxelEngine.WorldSeed
-        };
-        ImplicitFractal fractal = new ImplicitFractal(FractalType.FractionalBrownianMotion, BasisType.Gradient, InterpolationType.Quintic)
-        {
-            Octaves = 6,
-            Frequency = 5
-        };
-        ImplicitScaleOffset scaleOffset = new ImplicitScaleOffset(fractal, 1, 0);
-        for (int x = 0; x < heightmapSize; x++)
-        {
-            for (int z = 0; z < heightmapSize; z++)
-            {
-                double x1 = (double)x / 127;
-                double z1 = (double)z / 127;
-                // ImplicitSelect select = new ImplicitSelect(gradient, 128, 0, 0, 32.0);
-
-                //ImplicitRotateDomain rotateDomain = new ImplicitRotateDomain(translateDomain, 0, 0, 1, 90);
-                //ImplicitTranslateDomain translateDomain = new ImplicitTranslateDomain(gradient, 0, 0, scaleOffset.Get(x1 + posX, z1 + posZ));//scaleOffset.Get(x1, 64, z1));
-                ImplicitRotateDomain rotateDomain = new ImplicitRotateDomain(gradient, 1, 1, 1, 90);
-                //translateDomain = new ImplicitTranslateDomain(rotateDomain, 0, 0, 45);
-
-                lowlandTerrain = new ImplicitTranslateDomain(groundGradient, 0, lowlandDomain.Get(x1 + posX, 0, z1 + posZ));
-                highlandTerrain = new ImplicitTranslateDomain(groundGradient, 0, highlandDomain.Get(x1 + posX, 0, z1 + posZ));
-                highlowSelect = new ImplicitSelect(terrainDomain, lowlandTerrain.Get(x1 + posX, 0, z1 + posZ), highlandTerrain.Get(x1 + posX, 0, z1 + posZ), 0.15, 0.25);
-                groundSelect = new ImplicitSelect(highlowSelect, 128, 0, 3, 32.0);
-
-                //ImplicitSelect select = new ImplicitSelect(rotateDomain, 128, 0, 3, 32.0);
-                for (int y = 0; y < chunkHeight; y++)
-                {
-                    double value = groundSelect.Get(x1 + posX, y, z1 + posZ);//groundSelect.Get(x1, y, z1);
-                    //value = Remap((float)value, -1f, 1f, 0, 128);
-                    /*if (value == 0)
-                        this[x, y, z] = 1;
-                    else if (value == 1)
-                        this[x, y, z] = 2;*/
-    //value *= 128;
-    // if (value >= 0.5)
-    /*
-    this[x, y, z] = (ushort)value;
-
-}
-}
-}
-}
-*/
-    private void GenerateHeight(int _x, int _z)
-    {
-        double posX = _x / 128;
-        double posZ = _z / 128;
-        heightmapValues = new HeightmapValues();
+        int posX = _x / 128;
+        int posZ = _z / 128;
         for (int x = 0; x < heightmapSize; x++)
         {
             for (int z = 0; z < heightmapSize; z++)
             {
                 double x1 = x / (double)heightmapSize - 1;
                 double z1 = z / (double)heightmapSize - 1;
-                double value = HeightNoise.Get(x1 + posX, z1 + posZ);
-                heightmapValues[x, z] = value;
+                this[x, z] = CalcBiom(x1 + posX, z1 + posZ);
             }
         }
     }
-    private void SetHeight(int posX, int posZ)
+    private byte CalcBiom(double x, double z)
+    {
+        double value = BiomNoise.Get(x, z);
+        byte biom = (byte)((byte)(Remap((float)value, -1, 1, 1, 4) % 4) + 1);
+        return biom;
+    }
+    private void GenerateHeight(int _x, int _z)
     {
         /*
          Grass id:1     Dirt id:2    Stone id:3    Sand id:4   
          WoodenLog id:5    Leaves id:6      Water id:7
         */
         //_x - 0, 128, -128... : _z - 0, 128, -128...
+        double posX = _x / 128;
+        double posZ = _z / 128;
         for (int x = 0; x < heightmapSize; x++)
         {
             for (int z = 0; z < heightmapSize; z++)
             {
-                double value = heightmapValues[x, z];
-                value = Remap((float)value, -1, 1, 0, 0.95f);
+                double x1 = x / (double)heightmapSize - 1;
+                double z1 = z / (double)heightmapSize - 1;
+                byte biom = this[x, z];
+                double value = (HeightNoise.Get(x1 + posX, z1 + posZ) + BaseHNoise.Get(x1 + posX, z1 + posZ)) / 2f;
+                /*double value = HeightNoise.Get(x1 + posX, z1 + posZ) + BaseHNoise.Get(x1 + posX, z1 + posZ);
+                switch (biom)
+                {
+                    //biom mountains
+                    case 1:
+                        value += HillsNoise.Get(x1 + posX, z1 + posZ);
+                        break;
+                    //biom grassy lands
+                    case 2:
+                        value += GrassLandsNoise.Get(x1 + posX, z1 + posZ);
+                        break;
+                    //biom desert
+                    case 3:
+                        value += DesertNoise.Get(x1 + posX, z1 + posZ);
+                        break;
+                    //biom dirt
+                    case 4:
+                        value += WaterNoise.Get(x1 + posX, z1 + posZ);
+                        break;
+                    //biom grass
+                    default:
+                        value += GrassLandsNoise.Get(x1 + posX, z1 + posZ);
+                        break;
+                }
+                value /= 3f;*/
+                value = Remap((float)value, -1, 1, 0, 0.98f);
                 value *= 128;
                 int stone = (int)value + 15;
-                //stone += CalcStoneLevel(x + posX, z + posZ, x, z, this[x, z]);
-                //int ground = (CalcGroundLevel(x + posX, z + posZ, 0) + CalcGroundLevel(x + posX, z + posZ, 1))/2;
                 int ground = 3;
+
                 for (int y = 0; y < chunkHeight; y++)
                 {
-                    if (y > stone + ground + 1 && y <= 35)
-                        this[x, y, z] = 7;
                     if (y < stone)
                     {
                         this[x, y, z] = 3;
                     }
-                    else if (y <= ground + stone)
+                    else
                     {
-                        if (y <= 36)
-                            this[x, y, z] = 4;
-                        else if (y <= 100 && y > 36)
-                            this[x, y, z] = 2;
-                        else if (y <= 128 && y > 100)
-                            this[x, y, z] = 3;
-                    }
-                    else if (y <= ground + stone + 1)
-                    {
-                        if (y <= 36)
-                            this[x, y, z] = 4;
-                        else if (y <= 100 && y > 36)
-                            this[x, y, z] = 1;
-                        else if (y <= 128 && y > 100)
-                            this[x, y, z] = 3;
-                    }
-                    /*
-                    else if (y <= ground + stone + 2 && y < 90 && y > 38)
-                    {
-                        
-                        if (CheckPosition(x, y, z) && Noise.PerlinNoise(x + posX, y, z + posZ, 45, 5, 0.8f) > 1)
+                        if (y > stone + ground + 1 && y <= 35)
                         {
-                            SpawnTree(x, y, z);
+                            this[x, y, z] = 7;
+                        }
+                        else
+                        {
+                            if (y <= ground + stone)
+                            {
+                                /*
+                                 Grass id:1     Dirt id:2    Stone id:3    Sand id:4   
+                                 WoodenLog id:5    Leaves id:6      Water id:7
+                                */
+                                if (y <= 36)
+                                    this[x, y, z] = 4;
+                                else if (y <= 128 && y > 36)
+                                {
+                                    switch (biom)
+                                    {
+                                        case 3:
+                                            this[x, y, z] = 4;
+                                            break;
+                                        default:
+                                            this[x, y, z] = 2;
+                                            break;
+                                    }
+                                }
+                                /*else if (y <= 128 && y > 100)
+                                    this[x, y, z] = 3;*/
+                            }
+                            else if (y <= ground + stone + 1)
+                            {
+                                if (y <= 36)
+                                    this[x, y, z] = 4;
+                                else if (y <= 128 && y > 36)
+                                {
+                                    switch (biom)
+                                    {
+                                        //biom hills
+                                        case 1:
+                                            this[x, y, z] = 3;
+                                            break;
+                                        //biom grass
+                                        case 2:
+                                            this[x, y, z] = 1;
+                                            break;
+                                        //biom desert
+                                        case 3:
+                                            this[x, y, z] = 4;
+                                            break;
+                                        //biom dirt
+                                        case 4:
+                                            this[x, y, z] = 2;
+                                            break;
+                                        //biom grass
+                                        default:
+                                            this[x, y, z] = 1;
+                                            break;
+                                    }
+                                }
+                                /* else if (y <= 128 && y > 100)
+                                     this[x, y, z] = 1;*/
+                            }
+                            else if (biom == 2 && y > 38 && y < 90 && y <= ground + stone + 2)
+                            {
+                                if (CanSpawnTree(x, y, z, x1 + posX, z1 + posZ))
+                                {
+                                    SpawnTree(x, y, z);
+                                }
+                            }
                         }
                     }
-                    if (this[x, y, z] != 0 && y > 5 && y < stone && Noise.PerlinNoise(x + posX, y, z + posZ, 10, 5, 6f) < 5)
-                        this[x, y, z] = 2;
-                    //if (this[x, y, z] != 0 && y > 15 && y < 80 && y <= ground + stone + 2)
-                    //  GenerateCaves(x, y, z, posX, posZ);
-                    */
+                    /*if (y > 10 && y < 75 && y <= ground + stone + 2)
+                    {
+                        GenerateCaves(x, y, z, (int)(x1 + posX), (int)(z1 + posZ));
+                    }*/
                 }
             }
         }
@@ -306,23 +281,45 @@ public class Heightmap
     }
     private void GenerateCaves(int x, int y, int z, int posX, int posZ)
     {
-        /*
-        double x1 = x / (double)heightmapSize - 1;
-        double z1 = z / (double)heightmapSize - 1;
-        double value = CaveNoise.Get(x1 + posX, y, z1 + posZ);
-        value = Remap((float)value, -1f, 1f, 0.1f, 0.9f);
-        if (value > 0.7f)
-            this[x, y, z] = 0;*/
-        float caveNoise;
-        int cave1 = (int)CaveNoise.Get(x + posX, y, z + posZ) * 128;
-        int cave2 = Noise.Perlin3DNoise(x + posX, y, z + posZ, 12, 10, 1.7f);
-        caveNoise = cave1 + cave2;
-        caveNoise /= 2;
+        /*double value = CaveNoise.Get(x1, y, z1) * 128;
+        double value2 = Noise.Perlin3DNoise(x + (int)x1, y, z + (int)z1, 8, 9, 1.85f);
+        double caveNoise = value + value2;
+        caveNoise /= 2f;
+
         if (caveNoise < 5f)
+            this[x, y, z] = 0;*/
+        //int cave1 = (int)CaveNoise.Get(x + posX, y, z + posZ) * 128;
+        int cave1 = Noise.PerlinNoise(x + posX, y, z + posZ, 15f, 13f, 1.3f);
+        int cave2 = Noise.Perlin3DNoise(x + posX, y, z + posZ, 12f, 10f, 1.25f);
+        float caveNoise = (cave1 + cave2) / 2f;
+        if (caveNoise < 3.5f)
+        {
             this[x, y, z] = 0;
-
+        }
     }
-
+    private bool CanSpawnTree(int x, int y, int z, double x1, double z1)
+    {
+        if (x < 126 && x >= 2 && z < 126 && z >= 2 && this[x, y - 1, z] != 0)
+        {
+            for (int i = 0; i <= 4; i++)
+            {
+                if (this[x - 2, y + i, z - 2] != 0 || this[x + 2, y + i, z + 2] != 0 || this[x + 2, y + i, z - 2] != 0 || this[x - 2, y + i, z + 2] != 0)
+                {
+                    return false;
+                }
+            }
+            double value = (TreeNoise.Get(x1, z1));
+            value = Remap((float)value, -1, 1, 0, 1f);
+            if (value > 0.6f)
+                return true;
+            else
+                return false;
+        }
+        else
+        {
+            return false;
+        }
+    }
     private void SpawnTree(int x, int y, int z)
     {
         int numberOfLogs;
@@ -386,22 +383,16 @@ public class Heightmap
         this[x, y + numberOfLogs + 1, z + 1] = 6;
         this[x + 1, y + numberOfLogs + 1, z] = 6;
     }
-
-    private bool CheckPosition(int x, int y, int z)
+    private void SetSeeds()
     {
-        if (x < 126 && x >= 2 && z < 126 && z >= 2)
-        {
-            for (int i = 0; i <= 4; i++)
-            {
-                if (this[x - 2, y + i, z - 2] != 0 || this[x + 2, y + i, z + 2] != 0 || this[x + 2, y + i, z - 2] != 0 || this[x - 2, y + i, z + 2] != 0)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-        else
-        { return false; }
-
+        HeightNoise.Seed = (int)VoxelEngine.WorldSeed;
+        BaseHNoise.Seed = (int)VoxelEngine.WorldSeed;
+        TreeNoise.Seed = (int)VoxelEngine.WorldSeed;
+        CaveNoise.Seed = (int)VoxelEngine.WorldSeed;
+        BiomNoise.Seed = (int)VoxelEngine.WorldSeed;
+        GrassLandsNoise.Seed = (int)VoxelEngine.WorldSeed;
+        DesertNoise.Seed = (int)VoxelEngine.WorldSeed;
+        HillsNoise.Seed = (int)VoxelEngine.WorldSeed;
+        WaterNoise.Seed = (int)VoxelEngine.WorldSeed;
     }
 }
