@@ -119,7 +119,7 @@ MonoBehaviour:
     m_Bits: 512
   stopNaNPropagation: 0
   finalBlitToCameraTarget: 0
-  antialiasingMode: 2
+  antialiasingMode: 1
   temporalAntialiasing:
     jitterSpread: 0.75
     sharpness: 0.25
@@ -193,7 +193,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4652611952530368321}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 167d78ed6124d0e46bf656ad11c0ecb3, type: 3}
   m_Name: 
@@ -212,8 +212,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4652611953745217036}
-  - component: {fileID: 4652611953745217038}
+  - component: {fileID: 1631844945}
   - component: {fileID: 4652611953745217039}
+  - component: {fileID: 4652611953745217038}
   - component: {fileID: 4652611953745217136}
   m_Layer: 0
   m_Name: Player
@@ -237,24 +238,32 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!143 &4652611953745217038
-CharacterController:
+--- !u!114 &1631844945
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4652611953745217035}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 0
-  serializedVersion: 2
-  m_Height: 1.75
-  m_Radius: 0.4
-  m_SlopeLimit: 95
-  m_StepOffset: 0.1
-  m_SkinWidth: 0.01
-  m_MinMoveDistance: 0.0001
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b25fd5df3e37209489792dcd86b72fd7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Level: 1
+  HealthPoints: 100
+  HealthMultiplier: 1
+  isHostile: 0
+  isPlayer: 1
+  walkSpeed: 3
+  jumpForce: 1
+  mainPanel: {fileID: 0}
+  eqButton: {fileID: 0}
+  eqPanel: {fileID: 0}
+  craftButton: {fileID: 0}
+  craftPanel: {fileID: 0}
+  blocks: 0000000000000000000000000000000000000000
+  isCreative: 0
 --- !u!114 &4652611953745217039
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -277,6 +286,24 @@ MonoBehaviour:
   staminaDrain: 0.4
   frequency: 16
   amplitude: 0.005
+--- !u!143 &4652611953745217038
+CharacterController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4652611953745217035}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Height: 1.75
+  m_Radius: 0.4
+  m_SlopeLimit: 95
+  m_StepOffset: 0.15
+  m_SkinWidth: 0.02
+  m_MinMoveDistance: 0.0001
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!82 &4652611953745217136
 AudioSource:
   m_ObjectHideFlags: 0
