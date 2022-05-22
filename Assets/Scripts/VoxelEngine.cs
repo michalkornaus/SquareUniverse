@@ -81,7 +81,7 @@ public class VoxelEngine : MonoBehaviour
         }
         for (int i = 0; i < _player.blocks.Length; i++)
         {
-            //_player.blocks[i] = 0;
+            _player.blocks[i] = 255;
         }
     }
     private void LateUpdate()
