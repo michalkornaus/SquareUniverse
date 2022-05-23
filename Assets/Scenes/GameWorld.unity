@@ -163,11 +163,11 @@ MonoBehaviour:
   blockImage: {fileID: 2050910632}
   blockText: {fileID: 1078455286}
   blockAmount: {fileID: 930185810}
-  heightmapDistance: 1
+  heightmapDistance: 2
   worldHeight: 0
   chunkSize: 16
-  seed: 5
-  renderDistance: 4
+  seed: 10101
+  renderDistance: 8
   miningDistance: 5
   Sheep: {fileID: 3042120931469214523, guid: 2a61726d8d988c44e882de52c98e4775, type: 3}
   DesertCube: {fileID: 4865541332351845306, guid: b227f940fcf00264eb54bedc167a44f9,
