@@ -17,6 +17,7 @@ public class Heightmap : MultiThreading.ThreadedJob
     { Octaves = 3, Frequency = 0.25 };
 
     private static readonly int chunkWidth = 16;
+    private static readonly int chunkCount = 64;
     private static readonly int heightmapSize = 128;
     private static readonly int chunkHeight = 128;
 
@@ -35,10 +36,9 @@ public class Heightmap : MultiThreading.ThreadedJob
 
     private Vector2 position;
     //Cubes - Max 2 097 152
-    public byte[] Cubes = new byte[chunkHeight * chunkWidth * chunkWidth * 64];
-
+    public byte[] Cubes = new byte[chunkHeight * chunkWidth * chunkWidth * chunkCount];
     //CubesBioms - Max 16384
-    public byte[] CubesBioms = new byte[chunkWidth * chunkWidth * 64];
+    public byte[] CubesBioms = new byte[chunkWidth * chunkWidth * chunkCount];
 
     public Heightmap(int x, int z, int seed)
     {
@@ -100,9 +100,9 @@ public class Heightmap : MultiThreading.ThreadedJob
     public byte this[int x, int y, int z]
     {
         //x - 2 080 768   y -     z - 127
-        get { return Cubes[x * 128 * 128 + y * 128 + z]; }
+        get { return Cubes[x * heightmapSize * heightmapSize + y * chunkHeight + z]; }
         //x 2 080 768 + y 16256 z + 127 = 2 097 151
-        set { Cubes[x * 128 * 128 + y * 128 + z] = value; }
+        set { Cubes[x * heightmapSize * heightmapSize + y * chunkHeight + z] = value; }
     }
     public byte this[int x, int z]
     {
@@ -127,8 +127,8 @@ public class Heightmap : MultiThreading.ThreadedJob
     }
     private void GenerateBioms()
     {
-        double posX = position.x / 128;
-        double posZ = position.y / 128;
+        double posX = position.x / heightmapSize;
+        double posZ = position.y / heightmapSize;
         for (int x = 0; x < heightmapSize; x++)
         {
             for (int z = 0; z < heightmapSize; z++)
@@ -155,8 +155,8 @@ public class Heightmap : MultiThreading.ThreadedJob
     }
     private void GenerateHeight()
     {
-        double posX = position.x / 128;
-        double posZ = position.y / 128;
+        double posX = position.x / heightmapSize;
+        double posZ = position.y / heightmapSize;
         for (int x = 0; x < heightmapSize; x++)
         {
             for (int z = 0; z < heightmapSize; z++)
@@ -166,7 +166,7 @@ public class Heightmap : MultiThreading.ThreadedJob
                 byte biom = this[x, z];
                 double value = (HeightNoise.Get(x1 + posX, z1 + posZ) + BaseHNoise.Get(x1 + posX, z1 + posZ)) / 2f;
                 value = Remap((float)value, -1, 1, 0, 0.98f);
-                value *= 128;
+                value *= heightmapSize;
                 int stone = (int)value + 15;
                 int _max = Mathf.Max(stone + ground + 3, 36);
                 _max = Mathf.Min(_max, chunkHeight);

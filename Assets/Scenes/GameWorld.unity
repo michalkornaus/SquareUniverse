@@ -440,7 +440,7 @@ MonoBehaviour:
   biomStandingText: {fileID: 1244226739}
   chunkText: {fileID: 1584522280}
   heightmapDistance: 1
-  seed: 5
+  seed: 5000
   renderDistance: 8
   miningDistance: 5
   selectSquare: {fileID: 5212950569851148389, guid: 6ea85dede70a50242ab362cfceaccf7c,

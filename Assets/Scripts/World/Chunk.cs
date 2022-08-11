@@ -8,7 +8,8 @@ using UnityEngine;
 public class Chunk : MonoBehaviour
 {
     //TOTAL CUBES IN ONE CHUNK = 32768
-    //WORLD SIZE = 128
+    //CHUNK HEIGHT = 128
+    private static readonly int heightmapSize = 128;
     private static readonly int chunkWidth = 16;
     private static readonly int chunkHeight = 128;
 
@@ -134,10 +135,10 @@ public class Chunk : MonoBehaviour
         int posZ = (int)transform.position.z;
         int _posZ = posZ;
         if (posX < 0)
-            posX = (int)RoundUp(Mathf.Abs(posX), 128) + posX;
+            posX = (int)RoundUp(Mathf.Abs(posX), heightmapSize) + posX;
         if (posZ < 0)
-            posZ = (int)RoundUp(Mathf.Abs(posZ), 128) + posZ;
-        Cubes = heightmap.ReturnCubes(posX % 128, posZ % 128);
+            posZ = (int)RoundUp(Mathf.Abs(posZ), heightmapSize) + posZ;
+        Cubes = heightmap.ReturnCubes(posX % heightmapSize, posZ % heightmapSize);
         _voxelEngine.world.SetChunkDirty(_posX, _posZ, true);
     }
     /*

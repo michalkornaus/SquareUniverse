@@ -89,14 +89,14 @@ public class VoxelEngine : MonoBehaviour
     private void Start()
     {
         playerLoaded = LoadData();
-        StartCoroutine(WaitForLoadChunks(2f));
+        StartCoroutine(WaitForLoadChunks(2.5f));
     }
     void Update()
     {
         if (loadHeightmap)
             StartCoroutine(WaitForHeightmap());
         if (loadChunks)
-            StartCoroutine(WaitForLoadChunks(0f));
+            StartCoroutine(WaitForLoadChunks(0.5f));
 
         if (!playerSet)
             SetPlayerPosition();
@@ -163,7 +163,7 @@ public class VoxelEngine : MonoBehaviour
                     int _z = Mathf.FloorToInt(p.z);
                     coordsPointingText.text = "x: " + _x + " y: " + _y + " z: " + _z;
                     byte id = world[_x, _y, _z];
-                    byte biom = world.GetBiom(_x, _z);
+                    byte biom = world[_x, _z];
                     blockPointingText.text = Enums.GetBlockName(id) + " ID[" + id + "]";
                     biomPointingText.text = Enums.GetBiomName(biom) + " ID[" + biom + "]";
                 }
@@ -185,7 +185,7 @@ public class VoxelEngine : MonoBehaviour
                     int _z = Mathf.FloorToInt(p.z);
                     coordsStandingText.text = "x: " + _x + " y: " + _y + " z: " + _z;
                     byte id = world[_x, _y, _z];
-                    byte biom = world.GetBiom(_x, _z);
+                    byte biom = world[_x, _z];
                     blockStandingText.text = Enums.GetBlockName(id) + " ID[" + id + "]";
                     biomStandingText.text = Enums.GetBiomName(biom) + " ID[" + biom + "]";
                 }
@@ -221,7 +221,7 @@ public class VoxelEngine : MonoBehaviour
     {
         spawnEntity = false;
         Vector3 position = new Vector3(cam.transform.position.x + Random.Range(-entityDistToLoad, entityDistToLoad), 200, cam.transform.position.z + Random.Range(-entityDistToLoad, entityDistToLoad));
-        if (world.GetBiom((int)position.x, (int)position.z) == 2)
+        if (world[(int)position.x, (int)position.z] == 2)
         {
             if (Physics.Raycast(position, Vector3.down, out RaycastHit _hit))
             {

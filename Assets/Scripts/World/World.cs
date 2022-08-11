@@ -9,11 +9,9 @@ public class World
         get
         {
             if (Chunks.TryGetValue(ChunkId.FromWorldPos(x, z), out Chunk _chunk))
-            {
                 return _chunk[x & 0xF, y, z & 0xF];
-            }
             else
-                return 3;
+                return 0;
         }
         set
         {
@@ -24,10 +22,13 @@ public class World
             heightmap.SaveData();
         }
     }
-    public byte GetBiom(int x, int z)
+    public byte this[int x, int z]
     {
-        var heightmap = Heightmaps[HeightmapId.FromWorldPos(x, z)];
-        return heightmap[x & 0x7F, z & 0x7F];
+        get
+        {
+            var heightmap = Heightmaps[HeightmapId.FromWorldPos(x, z)];
+            return heightmap[x & 0x7F, z & 0x7F];
+        }
     }
     public void SetChunkDirty(int x, int z, bool newChunk)
     {
