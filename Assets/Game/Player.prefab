@@ -15,7 +15,6 @@ GameObject:
   - component: {fileID: 4652611952530368326}
   - component: {fileID: 4652611952530368327}
   - component: {fileID: 4652611952530368329}
-  - component: {fileID: 1008273813}
   m_Layer: 9
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -33,6 +32,7 @@ Transform:
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0.65, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4652611953745217036}
   m_RootOrder: 0
@@ -186,23 +186,6 @@ Behaviour:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4652611952530368321}
   m_Enabled: 1
---- !u!114 &1008273813
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4652611952530368321}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 167d78ed6124d0e46bf656ad11c0ecb3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  movementSpeed: 10
-  fastMovementSpeed: 100
-  freeLookSensitivity: 3
-  zoomSensitivity: 10
-  fastZoomSensitivity: 50
 --- !u!1 &4652611953745217035
 GameObject:
   m_ObjectHideFlags: 0
@@ -233,6 +216,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 100, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4652611952530368324}
   m_Father: {fileID: 0}
@@ -258,10 +242,11 @@ MonoBehaviour:
   walkSpeed: 3
   jumpForce: 1
   mainPanel: {fileID: 0}
-  eqButton: {fileID: 0}
   eqPanel: {fileID: 0}
-  craftButton: {fileID: 0}
   craftPanel: {fileID: 0}
+  item: {fileID: 0}
+  eqButton: {fileID: 0}
+  craftButton: {fileID: 0}
   blocks: 0000000000000000000000000000000000000000
   isCreative: 0
 --- !u!114 &4652611953745217039
@@ -277,11 +262,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cam: {fileID: 4652611952530368323}
+  playmode: 0
   walkSpeed: 3
-  sprintSpeed: 4.5
-  jumpForce: 1
   rotationSpeed: 3
   pushForce: 2
+  jumpForce: 1
+  sprintSpeed: 5
   staminaReg: 0.2
   staminaDrain: 0.4
   frequency: 16
