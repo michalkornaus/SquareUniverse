@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Collections;
 using UnityEngine;
+
 [RequireComponent(typeof(MeshFilter))]
 [RequireComponent(typeof(MeshRenderer))]
 [RequireComponent(typeof(MeshCollider))]
@@ -8,17 +9,17 @@ public class Chunk : MonoBehaviour
 {
     //TOTAL CUBES IN ONE CHUNK = 32768
     //WORLD SIZE = 128
-    public static int chunkSize = 16;
-    public static int chunkHeight = chunkSize * 8;
+    private static readonly int chunkWidth = 16;
+    private static readonly int chunkHeight = 128;
 
-    public byte[] Cubes = new byte[chunkHeight * chunkSize * chunkSize];
+    public byte[] Cubes = new byte[chunkHeight * chunkWidth * chunkWidth];
     public byte this[int x, int y, int z]
     {
-        get { return Cubes[x * chunkHeight * chunkSize + y * chunkSize + z]; }
-        set { Cubes[x * chunkHeight * chunkSize + y * chunkSize + z] = value; }
+        get { return Cubes[x * chunkHeight * chunkWidth + y * chunkWidth + z]; }
+        set { Cubes[x * chunkHeight * chunkWidth + y * chunkWidth + z] = value; }
     }
     public bool isDirty = false;
-
+    private Heightmap heightmap;
     //COMPONENTS
     private Material[] materials = new Material[3];
     private MeshFilter _meshFilter;
@@ -55,8 +56,8 @@ public class Chunk : MonoBehaviour
 
     void Awake()
     {
-        gameObject.isStatic = true;
         _voxelEngine = GetComponentInParent<VoxelEngine>();
+        heightmap = _voxelEngine.world.Heightmaps[HeightmapId.FromWorldPos((int)transform.position.x, (int)transform.position.z)];
         _c = new Vector3[]
         {
           new Vector3 (0, 0, cubeSize),
@@ -114,36 +115,64 @@ public class Chunk : MonoBehaviour
         materials[2] = _voxelEngine.waterMat;
         _meshFilter = GetComponent<MeshFilter>();
         _meshFilter.mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        _meshFilter.mesh.MarkDynamic();
         _meshRenderer = GetComponent<MeshRenderer>();
         _meshCollider = GetComponent<MeshCollider>();
         _meshRenderer.materials = materials;
         _meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
-        StartCoroutine(WaitForHeight());
+        GetHeight();
     }
     private void Update()
     {
         if (isDirty)
             RenderToMesh();
     }
+    private void GetHeight()
+    {
+        int posX = (int)transform.position.x;
+        int _posX = posX;
+        int posZ = (int)transform.position.z;
+        int _posZ = posZ;
+        if (posX < 0)
+            posX = (int)RoundUp(Mathf.Abs(posX), 128) + posX;
+        if (posZ < 0)
+            posZ = (int)RoundUp(Mathf.Abs(posZ), 128) + posZ;
+        Cubes = heightmap.ReturnCubes(posX % 128, posZ % 128);
+        _voxelEngine.world.SetChunkDirty(_posX, _posZ, true);
+    }
+    /*
     private IEnumerator WaitForHeight()
     {
         int posX = (int)transform.position.x;
+        int _posX = posX;
         int posZ = (int)transform.position.z;
+        int _posZ = posZ;
         if (_voxelEngine.world.Heightmap.ContainsKey(HeightmapId.FromWorldPos(posX, posZ)))
         {
             Heightmap hm = _voxelEngine.world.Heightmap[HeightmapId.FromWorldPos(posX, posZ)];
-            if (posX < 0)
-                posX = (int)RoundUp(Mathf.Abs(posX), 128) + posX;
-            if (posZ < 0)
-                posZ = (int)RoundUp(Mathf.Abs(posZ), 128) + posZ;
-            Cubes = hm.ReturnCubes(posX % 128, posZ % 128);
+            if (hm.IsDone)
+            {
+                if (posX < 0)
+                    posX = (int)RoundUp(Mathf.Abs(posX), 128) + posX;
+                if (posZ < 0)
+                    posZ = (int)RoundUp(Mathf.Abs(posZ), 128) + posZ;
+                Cubes = hm.ReturnCubes(posX % 128, posZ % 128);
+                _voxelEngine.world.SetChunkDirty(_posX, _posZ, true);
+                //isDirty = true;
+            }
+            else
+            {
+                yield return new WaitForSeconds(1f);
+                StartCoroutine(WaitForHeight());
+            }
+
         }
         else
         {
-            yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(1f);
             StartCoroutine(WaitForHeight());
         }
-    }
+    }*/
     private void RenderToMesh()
     {
         isDirty = false;
@@ -153,21 +182,21 @@ public class Chunk : MonoBehaviour
         var transparentTriangles = new List<int>();
         var normals = new List<Vector3>();
         var uvs = new List<Vector2>();
-        for (var x = 0; x < chunkSize; x++)
+        for (var x = 0; x < chunkWidth; x++)
         {
             for (var y = 0; y < chunkHeight; y++)
             {
-                for (var z = 0; z < chunkSize; z++)
+                for (var z = 0; z < chunkWidth; z++)
                 {
                     var voxelType = this[x, y, z];
-                    if (voxelType == 0)
+                    if (voxelType == (byte)Blocks.Air)
                         continue;
                     var _cubeTriangles = CalcTriangleFaces(x, y, z);
                     if (_cubeTriangles.Count == 0)
                         continue;
                     var pos = new Vector3(x, y, z);
                     var verticesPos = vertices.Count;
-                    if (voxelType == 7 && this[x, y + 1, z] == 0)
+                    if (voxelType == (byte)Blocks.Water && this[x, y + 1, z] == (byte)Blocks.Air)
                     {
                         foreach (var vert in _waterVertices)
                             vertices.Add(pos + vert);
@@ -179,9 +208,9 @@ public class Chunk : MonoBehaviour
                     }
                     foreach (var tri in _cubeTriangles)
                     {
-                        if (voxelType == 7)
+                        if (voxelType == (byte)Blocks.Water)
                         { waterTriangles.Add(tri + verticesPos); }
-                        else if (voxelType == 12 || voxelType == 13)
+                        else if (voxelType == (byte)Blocks.FancyLeaves || voxelType == (byte)Blocks.Glass)
                         { transparentTriangles.Add(tri + verticesPos); }
                         else
                         { opaqueTriangles.Add(tri + verticesPos); }
@@ -285,12 +314,9 @@ public class Chunk : MonoBehaviour
             }
         }
         Mesh mesh = _meshFilter.mesh;
-        Mesh collisionMesh = new Mesh();
-        mesh.MarkDynamic();
+        Mesh collisionMesh = new();
         collisionMesh.MarkDynamic();
         collisionMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-        mesh.Clear();
-        mesh.ClearBlendShapes();
         mesh.subMeshCount = 3;
         mesh.SetVertices(vertices);
         mesh.SetTriangles(opaqueTriangles, 0);
@@ -306,54 +332,135 @@ public class Chunk : MonoBehaviour
         {
             mesh.SetTriangles(waterTriangles, 2);
         }
+        mesh.RecalculateNormals();
         mesh.SetUVs(0, uvs);
         mesh.SetNormals(normals);
-        mesh.RecalculateNormals();
-        mesh.RecalculateBounds();
-        mesh.RecalculateTangents();
+        mesh.Optimize();
         collisionMesh.Optimize();
         _meshCollider.sharedMesh = collisionMesh;
     }
-
+    private void AddRange(ref List<int> triangles, byte _this, byte other, string quad)
+    {
+        if (other == 0 || other == 7 || other == 12 || other == 13)
+        {
+            //water
+            if (_this == 7)
+            {
+                if (other == 0 || other == 12 || other == 13)
+                {
+                    switch (quad)
+                    {
+                        case "Bottom":
+                            triangles.AddRange(BottomQuad);
+                            break;
+                        case "Top":
+                            triangles.AddRange(TopQuad);
+                            break;
+                        case "Left":
+                            triangles.AddRange(LeftQuad);
+                            break;
+                        case "Right":
+                            triangles.AddRange(RightQuad);
+                            break;
+                        case "Back":
+                            triangles.AddRange(BackQuad);
+                            break;
+                        case "Front":
+                            triangles.AddRange(FrontQuad);
+                            break;
+                    }
+                }
+            }
+            //leaves
+            else if (_this == 12)
+            {
+                if (other == 0 || other == 7 || other == 12 || other == 13)
+                {
+                    switch (quad)
+                    {
+                        case "Bottom":
+                            triangles.AddRange(BottomQuad);
+                            break;
+                        case "Top":
+                            triangles.AddRange(TopQuad);
+                            break;
+                        case "Left":
+                            triangles.AddRange(LeftQuad);
+                            break;
+                        case "Right":
+                            triangles.AddRange(RightQuad);
+                            break;
+                        case "Back":
+                            triangles.AddRange(BackQuad);
+                            break;
+                        case "Front":
+                            triangles.AddRange(FrontQuad);
+                            break;
+                    }
+                }
+            }
+            //glass
+            else if (_this == 13)
+            {
+                if (other == 0 || other == 7 || other == 12)
+                {
+                    switch (quad)
+                    {
+                        case "Bottom":
+                            triangles.AddRange(BottomQuad);
+                            break;
+                        case "Top":
+                            triangles.AddRange(TopQuad);
+                            break;
+                        case "Left":
+                            triangles.AddRange(LeftQuad);
+                            break;
+                        case "Right":
+                            triangles.AddRange(RightQuad);
+                            break;
+                        case "Back":
+                            triangles.AddRange(BackQuad);
+                            break;
+                        case "Front":
+                            triangles.AddRange(FrontQuad);
+                            break;
+                    }
+                }
+            }
+            else
+            {
+                switch (quad)
+                {
+                    case "Bottom":
+                        triangles.AddRange(BottomQuad);
+                        break;
+                    case "Top":
+                        triangles.AddRange(TopQuad);
+                        break;
+                    case "Left":
+                        triangles.AddRange(LeftQuad);
+                        break;
+                    case "Right":
+                        triangles.AddRange(RightQuad);
+                        break;
+                    case "Back":
+                        triangles.AddRange(BackQuad);
+                        break;
+                    case "Front":
+                        triangles.AddRange(FrontQuad);
+                        break;
+                }
+            }
+        }
+    }
     private List<int> CalcTriangleFaces(int x, int y, int z)
     {
         var triangles = new List<int>();
         //Bottom
         if (y > 0)
         {
-            byte _below = this[x, y - 1, z];
-            byte _this = this[x, y, z];
-            if (_below == 0 || _below == 7 || _below == 12 || _below == 13)
-            {
-                //water
-                if (_this == 7)
-                {
-                    if (_below == 0 || _below == 12 || _below == 13)
-                    {
-                        triangles.AddRange(BottomQuad);
-                    }
-                }
-                //leaves
-                else if (_this == 12)
-                {
-                    if (_below == 0 || _below == 7 || _below == 12 || _below == 13)
-                    {
-                        triangles.AddRange(BottomQuad);
-                    }
-                }
-                //glass
-                else if (_this == 13)
-                {
-                    if (_below == 0 || _below == 7 || _below == 12)
-                    {
-                        triangles.AddRange(BottomQuad);
-                    }
-                }
-                else
-                {
-                    triangles.AddRange(BottomQuad);
-                }
-            }
+            byte below = this[x, y - 1, z];
+            AddRange(ref triangles, this[x, y, z], below, "Bottom");
         }
         else
         { triangles.AddRange(BottomQuad); }
@@ -361,39 +468,8 @@ public class Chunk : MonoBehaviour
         //Top
         if (y < chunkHeight - 1)
         {
-            byte _above = this[x, y + 1, z];
-            byte _this = this[x, y, z];
-            if (_above == 0 || _above == 7 || _above == 12 || _above == 13)
-            {
-                //water
-                if (_this == 7)
-                {
-                    if (_above == 0 || _above == 12 || _above == 13)
-                    {
-                        triangles.AddRange(TopQuad);
-                    }
-                }
-                //leaves
-                else if (_this == 12)
-                {
-                    if (_above == 0 || _above == 7 || _above == 12 || _above == 13)
-                    {
-                        triangles.AddRange(TopQuad);
-                    }
-                }
-                //glass
-                else if (_this == 13)
-                {
-                    if (_above == 0 || _above == 7 || _above == 12)
-                    {
-                        triangles.AddRange(TopQuad);
-                    }
-                }
-                else
-                {
-                    triangles.AddRange(TopQuad);
-                }
-            }
+            byte above = this[x, y + 1, z];
+            AddRange(ref triangles, this[x, y, z], above, "Top");
         }
         else
         { triangles.AddRange(TopQuad); }
@@ -401,299 +477,51 @@ public class Chunk : MonoBehaviour
         //Left
         if (x > 0)
         {
-            byte _left = this[x - 1, y, z];
-            byte _this = this[x, y, z];
-            if (_left == 0 || _left == 7 || _left == 12 || _left == 13)
-            {
-                //water
-                if (_this == 7)
-                {
-                    if (_left == 0 || _left == 12 || _left == 13)
-                    {
-                        triangles.AddRange(LeftQuad);
-                    }
-                }
-                //leaves
-                else if (_this == 12)
-                {
-                    if (_left == 0 || _left == 7 || _left == 12 || _left == 13)
-                    {
-                        triangles.AddRange(LeftQuad);
-                    }
-                }
-                //glass
-                else if (_this == 13)
-                {
-                    if (_left == 0 || _left == 7 || _left == 12)
-                    {
-                        triangles.AddRange(LeftQuad);
-                    }
-                }
-                else
-                {
-                    triangles.AddRange(LeftQuad);
-                }
-            }
+            byte left = this[x - 1, y, z];
+            AddRange(ref triangles, this[x, y, z], left, "Left");
         }
         else
         {
-            int value = _voxelEngine.world[(int)transform.position.x - 1, y, (int)transform.position.z + z];
-            byte _this = this[x, y, z];
-            if (value == 0 || value == 7 || value == 12 || value == 13)
-            {
-                //water
-                if (_this == 7)
-                {
-                    if (value == 0 || value == 12 || value == 13)
-                    {
-                        triangles.AddRange(LeftQuad);
-                    }
-                }
-                //leaves
-                else if (_this == 12)
-                {
-                    if (value == 0 || value == 7 || value == 12 || value == 13)
-                    {
-                        triangles.AddRange(LeftQuad);
-                    }
-                }
-                //glass
-                else if (_this == 13)
-                {
-                    if (value == 0 || value == 7 || value == 12)
-                    {
-                        triangles.AddRange(LeftQuad);
-                    }
-                }
-                else
-                {
-                    triangles.AddRange(LeftQuad);
-                }
-            }
+            byte value = _voxelEngine.world[(int)transform.position.x - 1, y, (int)transform.position.z + z];
+            AddRange(ref triangles, this[x, y, z], value, "Left");
         }
 
         //Right
-        if (x < chunkSize - 1)
+        if (x < chunkWidth - 1)
         {
-            byte _right = this[x + 1, y, z];
-            byte _this = this[x, y, z];
-            if (_right == 0 || _right == 7 || _right == 12 || _right == 13)
-            {
-                //water
-                if (_this == 7)
-                {
-                    if (_right == 0 || _right == 12 || _right == 13)
-                    {
-                        triangles.AddRange(RightQuad);
-                    }
-                }
-                //leaves
-                else if (_this == 12)
-                {
-                    if (_right == 0 || _right == 7 || _right == 12 || _right == 13)
-                    {
-                        triangles.AddRange(RightQuad);
-                    }
-                }
-                //glass
-                else if (_this == 13)
-                {
-                    if (_right == 0 || _right == 7 || _right == 12)
-                    {
-                        triangles.AddRange(RightQuad);
-                    }
-                }
-                else
-                {
-                    triangles.AddRange(RightQuad);
-                }
-            }
+            byte right = this[x + 1, y, z];
+            AddRange(ref triangles, this[x, y, z], right, "Right");
         }
         else
         {
-            int value = _voxelEngine.world[(int)transform.position.x + chunkSize, y, (int)transform.position.z + z];
-            byte _this = this[x, y, z];
-            if (value == 0 || value == 7 || value == 12 || value == 13)
-            {
-                //water
-                if (_this == 7)
-                {
-                    if (value == 0 || value == 12 || value == 13)
-                    {
-                        triangles.AddRange(RightQuad);
-                    }
-                }
-                //leaves
-                else if (_this == 12)
-                {
-                    if (value == 0 || value == 7 || value == 12 || value == 13)
-                    {
-                        triangles.AddRange(RightQuad);
-                    }
-                }
-                //glass
-                else if (_this == 13)
-                {
-                    if (value == 0 || value == 7 || value == 12)
-                    {
-                        triangles.AddRange(RightQuad);
-                    }
-                }
-                else
-                {
-                    triangles.AddRange(RightQuad);
-                }
-            }
+            byte value = _voxelEngine.world[(int)transform.position.x + chunkWidth, y, (int)transform.position.z + z];
+            AddRange(ref triangles, this[x, y, z], value, "Right");
         }
 
         //Back
         if (z > 0)
         {
-            byte _back = this[x, y, z - 1];
-            byte _this = this[x, y, z];
-            if (_back == 0 || _back == 7 || _back == 12 || _back == 13)
-            {
-                //water
-                if (_this == 7)
-                {
-                    if (_back == 0 || _back == 12 || _back == 13)
-                    {
-                        triangles.AddRange(BackQuad);
-                    }
-                }
-                //leaves
-                else if (_this == 12)
-                {
-                    if (_back == 0 || _back == 7 || _back == 12 || _back == 13)
-                    {
-                        triangles.AddRange(BackQuad);
-                    }
-                }
-                //glass
-                else if (_this == 13)
-                {
-                    if (_back == 0 || _back == 7 || _back == 12)
-                    {
-                        triangles.AddRange(BackQuad);
-                    }
-                }
-                else
-                {
-                    triangles.AddRange(BackQuad);
-                }
-            }
+            byte back = this[x, y, z - 1];
+            AddRange(ref triangles, this[x, y, z], back, "Back");
         }
         else
         {
-            int value = _voxelEngine.world[(int)transform.position.x + x, y, (int)transform.position.z - 1];
-            byte _this = this[x, y, z];
-            if (value == 0 || value == 7 || value == 12 || value == 13)
-            {
-                //water
-                if (_this == 7)
-                {
-                    if (value == 0 || value == 12 || value == 13)
-                    {
-                        triangles.AddRange(BackQuad);
-                    }
-                }
-                //leaves
-                else if (_this == 12)
-                {
-                    if (value == 0 || value == 7 || value == 12 || value == 13)
-                    {
-                        triangles.AddRange(BackQuad);
-                    }
-                }
-                //glass
-                else if (_this == 13)
-                {
-                    if (value == 0 || value == 7 || value == 12)
-                    {
-                        triangles.AddRange(BackQuad);
-                    }
-                }
-                else
-                {
-                    triangles.AddRange(BackQuad);
-                }
-            }
+            byte value = _voxelEngine.world[(int)transform.position.x + x, y, (int)transform.position.z - 1];
+            AddRange(ref triangles, this[x, y, z], value, "Back");
         }
 
         //Front
-        if (z < chunkSize - 1)
+        if (z < chunkWidth - 1)
         {
-            byte _front = this[x, y, z + 1];
-            byte _this = this[x, y, z];
-            if (_front == 0 || _front == 7 || _front == 12 || _front == 13)
-            {
-                //water
-                if (_this == 7)
-                {
-                    if (_front == 0 || _front == 12 || _front == 13)
-                    {
-                        triangles.AddRange(FrontQuad);
-                    }
-                }
-                //leaves
-                else if (_this == 12)
-                {
-                    if (_front == 0 || _front == 7 || _front == 12 || _front == 13)
-                    {
-                        triangles.AddRange(FrontQuad);
-                    }
-                }
-                //glass
-                else if (_this == 13)
-                {
-                    if (_front == 0 || _front == 7 || _front == 12)
-                    {
-                        triangles.AddRange(FrontQuad);
-                    }
-                }
-                else
-                {
-                    triangles.AddRange(FrontQuad);
-                }
-            }
+            byte front = this[x, y, z + 1];
+            AddRange(ref triangles, this[x, y, z], front, "Front");
         }
         else
         {
-            int value = _voxelEngine.world[(int)transform.position.x + x, y, (int)transform.position.z + chunkSize];
-            byte _this = this[x, y, z];
-            if (value == 0 || value == 7 || value == 12 || value == 13)
-            {
-                //water
-                if (_this == 7)
-                {
-                    if (value == 0 || value == 12 || value == 13)
-                    {
-                        triangles.AddRange(FrontQuad);
-                    }
-                }
-                //leaves
-                else if (_this == 12)
-                {
-                    if (value == 0 || value == 7 || value == 12 || value == 13)
-                    {
-                        triangles.AddRange(FrontQuad);
-                    }
-                }
-                //glass
-                else if (_this == 13)
-                {
-                    if (value == 0 || value == 7 || value == 12)
-                    {
-                        triangles.AddRange(FrontQuad);
-                    }
-                }
-                else
-                {
-                    triangles.AddRange(FrontQuad);
-                }
-            }
+            byte value = _voxelEngine.world[(int)transform.position.x + x, y, (int)transform.position.z + chunkWidth];
+            AddRange(ref triangles, this[x, y, z], value, "Front");
         }
-        
+
         return triangles;
     }
 

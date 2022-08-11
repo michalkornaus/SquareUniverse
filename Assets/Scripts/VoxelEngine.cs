@@ -1,16 +1,15 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using System.Threading.Tasks;
 using UnityEngine.UI;
 using UnityEngine.U2D;
 using System.Linq;
 using System.IO;
+using TMPro;
 
 public class VoxelEngine : MonoBehaviour
 {
-    public static int WorldSeed;
-    public World world = new World();
+    public World world = new();
 
     [Header("Materials")]
     public Material opaqueMat;
@@ -18,75 +17,191 @@ public class VoxelEngine : MonoBehaviour
     public Material transparentMat;
     public SpriteAtlas spriteAtlas;
 
-    [Header("UI")]
-    public GameObject selectSquare;
+    [Header("User Interface")]
+    [Header("Block UI")]
     public GameObject blockBorder;
     public Image blockImage;
     public Text blockText;
     public Text blockAmount;
 
+    [Header("Debug menu")]
+    public GameObject debugPanel;
+    public TMP_Text coordsPointingText;
+    public TMP_Text blockPointingText;
+    public TMP_Text biomPointingText;
+
+    public TMP_Text coordsStandingText;
+    public TMP_Text blockStandingText;
+    public TMP_Text biomStandingText;
+
+    public TMP_Text chunkText;
+    private bool debugEnabled = false;
+
     [Header("World settings")]
     public int heightmapDistance;
-    public int worldHeight;
-    public int chunkSize;
     public int seed;
+    //private world settings variables
+    private static readonly int chunkWidth = 16;
     private int distanceToUnload;
     private int distanceToLoad;
+    private int entityDistToLoad;
 
     [Header("Player settings")]
     public int renderDistance;
     public float miningDistance;
-    private GameObject player;
-    private Player _player;
-    //private List<byte> equipment;
-    private Transform playerPos;
+    public GameObject selectSquare;
+    public GameObject waterPanel;
+    //Private player variables
     private GameObject _selectSquare;
-    private Camera _camera;
+
+    private Transform player;
+    private Player _player;
+    private Movement _movement;
+    private Camera cam;
+
+    private bool playerSet = false;
+    private bool playerLoaded = false;
 
     [Header("Entities")]
     private int entityCount;
     public GameObject Sheep;
-    public GameObject DesertCube;
 
     //Private variables
     private int index = 1;
     private bool loadChunks = false;
-    private bool loadHeightmap = false;
+    private bool loadHeightmap = true;
     private bool spawnEntity = false;
-    private bool setPlayer = false;
-    private bool playerSet = false;
 
     void Awake()
     {
-        FindNewSeed();
+        //Instantiating square which shows what block player is aiming at
         _selectSquare = Instantiate(selectSquare, Vector3.zero, Quaternion.identity);
-        _camera = Camera.main;
-        playerPos = _camera.transform;
-        player = GameObject.FindWithTag("Player");
+        //setting variables
+        cam = Camera.main;
+        player = GameObject.FindWithTag("Player").transform;
         _player = player.GetComponent<Player>();
-
-        worldHeight = 8 * chunkSize;
-        distanceToLoad = 16 * 2;
+        _movement = player.GetComponent<Movement>();
+        //calculating distances to load and unload entities and chunks
+        distanceToLoad = renderDistance * 16;
+        entityDistToLoad = 16 * 2;
         distanceToUnload = (renderDistance * 32) + 16;
     }
     private void Start()
     {
-        if (LoadData())
-        {
+        playerLoaded = LoadData();
+        StartCoroutine(WaitForLoadChunks(2f));
+    }
+    void Update()
+    {
+        if (loadHeightmap)
             StartCoroutine(WaitForHeightmap());
-        }
-        else
-        {
-            StartCoroutine(WaitForHeightmap());
-        }
-        for (int i = 0; i < _player.blocks.Length; i++)
-        {
-            _player.blocks[i] = 255;
-        }
+        if (loadChunks)
+            StartCoroutine(WaitForLoadChunks(0f));
+
+        if (!playerSet)
+            SetPlayerPosition();
+
+        MiningPlacingBlocks();
     }
     private void LateUpdate()
     {
+        if (Input.GetKeyDown(KeyCode.H))
+        {
+            debugEnabled = !debugEnabled;
+        }
+        UpdateDebug();
         UnloadChunks();
+    }
+    private void FixedUpdate()
+    {
+        CheckForWater();
+    }
+    private void CheckForWater()
+    {
+        float radius = player.GetComponent<CharacterController>().radius;
+        float heightOffset = player.GetComponent<CharacterController>().height / 2f;
+        Vector3[] positions = new Vector3[4];
+        positions[0] = new Vector3(player.position.x + radius, player.position.y - heightOffset, player.position.z);
+        positions[1] = new Vector3(player.position.x - radius, player.position.y - heightOffset, player.position.z);
+        positions[2] = new Vector3(player.position.x, player.position.y - heightOffset, player.position.z + radius);
+        positions[3] = new Vector3(player.position.x, player.position.y - heightOffset, player.position.z - radius);
+        _movement.SetPlayerInWater(PlayerInWater(positions));
+
+        int _x = Mathf.FloorToInt(cam.transform.position.x);
+        int _y = Mathf.FloorToInt(cam.transform.position.y);
+        int _z = Mathf.FloorToInt(cam.transform.position.z);
+        if (world[_x, _y, _z] == (byte)Blocks.Water)
+            waterPanel.SetActive(true);
+        else
+            waterPanel.SetActive(false);
+    }
+    private bool PlayerInWater(Vector3[] pos)
+    {
+        for (int i = 0; i < pos.Length; i++)
+        {
+            if (world[Mathf.FloorToInt(pos[i].x), Mathf.FloorToInt(pos[i].y), Mathf.FloorToInt(pos[i].z)] == (byte)Blocks.Water)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    private void UpdateDebug()
+    {
+        if (debugEnabled)
+        {
+            debugPanel.SetActive(true);
+            //Getting block coords player is pointing at
+            var ray = cam.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out RaycastHit hit))
+            {
+                if (hit.collider.tag == "Chunk")
+                {
+                    var p = hit.point - (hit.normal / 2f);
+                    int _x = Mathf.FloorToInt(p.x);
+                    int _y = Mathf.FloorToInt(p.y);
+                    int _z = Mathf.FloorToInt(p.z);
+                    coordsPointingText.text = "x: " + _x + " y: " + _y + " z: " + _z;
+                    byte id = world[_x, _y, _z];
+                    byte biom = world.GetBiom(_x, _z);
+                    blockPointingText.text = Enums.GetBlockName(id) + " ID[" + id + "]";
+                    biomPointingText.text = Enums.GetBiomName(biom) + " ID[" + biom + "]";
+                }
+            }
+            else
+            {
+                coordsPointingText.text = "";
+                biomPointingText.text = "";
+                blockPointingText.text = "";
+            }
+            //Getting block coords player is standing on
+            if (Physics.Raycast(player.position, Vector3.down, out RaycastHit _hit))
+            {
+                if (_hit.collider.tag == "Chunk")
+                {
+                    var p = _hit.point - (_hit.normal / 2f);
+                    int _x = Mathf.FloorToInt(p.x);
+                    int _y = Mathf.FloorToInt(p.y);
+                    int _z = Mathf.FloorToInt(p.z);
+                    coordsStandingText.text = "x: " + _x + " y: " + _y + " z: " + _z;
+                    byte id = world[_x, _y, _z];
+                    byte biom = world.GetBiom(_x, _z);
+                    blockStandingText.text = Enums.GetBlockName(id) + " ID[" + id + "]";
+                    biomStandingText.text = Enums.GetBiomName(biom) + " ID[" + biom + "]";
+                }
+            }
+            else
+            {
+                coordsStandingText.text = "";
+                biomStandingText.text = "";
+                blockStandingText.text = "";
+            }
+            //Getting chunk info
+            var chunk = world.Chunks[ChunkId.FromWorldPos(Mathf.FloorToInt(player.position.x), Mathf.FloorToInt(player.position.z))];
+            chunkText.text = chunk.name + "\nX: " + chunk.transform.position.x + ", Z: " + chunk.transform.position.z;
+        }
+        else
+            debugPanel.SetActive(false);
     }
     private void UpdateUI()
     {
@@ -95,61 +210,17 @@ public class VoxelEngine : MonoBehaviour
             blockBorder.SetActive(true);
             blockAmount.text = "x" + _player.blocks[index].ToString();
             blockImage.sprite = spriteAtlas.GetSprite(index.ToString());
-            blockText.text = GetBlockText(index);
+            blockText.text = Enums.GetBlockName(index);
         }
         else
         {
             blockBorder.SetActive(false);
         }
     }
-    private string GetBlockText(int id)
-    {
-        switch (id)
-        {
-            case 0:
-                return "Air";
-            case 1:
-                return "Grass";
-            case 2:
-                return "Dirt";
-            case 3:
-                return "Stone";
-            case 4:
-                return "Sand";
-            case 5:
-                return "Log";
-            case 6:
-                return "Leaves";
-            case 7:
-                return "Water";
-            case 8:
-                return "Cobblestone";
-            case 9:
-                return "Planks";
-            case 10:
-                return "Clay";
-            case 11:
-                return "Bricks";
-            case 12:
-                return "Fancy Leaves";
-            case 13:
-                return "Glass";
-            case 14:
-                return "Coal Ore";
-            case 15:
-                return "Iron Ore";
-            case 16:
-                return "Workbench";
-            case 17:
-                return "Furnace";
-            default:
-                return "Null";
-        }
-    }
     private IEnumerator SpawnEntity(GameObject gameObject)
     {
         spawnEntity = false;
-        Vector3 position = new Vector3(_camera.transform.position.x + Random.Range(-distanceToLoad, distanceToLoad), 200, _camera.transform.position.z + Random.Range(-distanceToLoad, distanceToLoad));
+        Vector3 position = new Vector3(cam.transform.position.x + Random.Range(-entityDistToLoad, entityDistToLoad), 200, cam.transform.position.z + Random.Range(-entityDistToLoad, entityDistToLoad));
         if (world.GetBiom((int)position.x, (int)position.z) == 2)
         {
             if (Physics.Raycast(position, Vector3.down, out RaycastHit _hit))
@@ -163,34 +234,35 @@ public class VoxelEngine : MonoBehaviour
         yield return new WaitForSeconds(5f);
         spawnEntity = true;
     }
-    /*private IEnumerator SpawnBomb()
-    {
-        spawnEnemy = false;
-        Vector3 position = new Vector3(_camera.transform.position.x + Random.Range(-distanceToLoad, distanceToLoad), 120, _camera.transform.position.z + Random.Range(-distanceToLoad, distanceToLoad));
-        Instantiate(DesertCube, position, Quaternion.identity);
-        yield return new WaitForSeconds(4f);
-        spawnEnemy = true;
-    }*/
-    private void OnApplicationQuit()
+    private void OnApplicationQuit() //Saving player data on application quit 
     {
         SaveData();
     }
     private bool LoadData()
     {
+        //Creating string with destination path where files are located
         string dest = Application.persistentDataPath + "/" + seed + "/" + "player.dat";
         if (File.Exists(dest))
         {
             var br = new BinaryReader(File.OpenRead(dest));
+            //reading saved values using BinaryReader
             float _x = br.ReadSingle();
             float _y = br.ReadSingle();
             float _z = br.ReadSingle();
-            player.transform.position = new Vector3(_x, _y, _z);
+
+            float _xR = br.ReadSingle();
+            float _yR = br.ReadSingle();
+
+            //assigning loaded values to player position, rotation and saved blocks
+            player.position = new Vector3(_x, _y, _z);
+            cam.GetComponent<PlayerCamera>().SetRotation(_xR);
+            player.GetComponent<Movement>().SetRotation(_yR);
             _player.blocks = br.ReadBytes(20);
             br.Close();
             return true;
         }
         else
-            return false;
+            return false; // returning false if file doesn't exist
     }
     private void SaveData()
     {
@@ -201,10 +273,15 @@ public class VoxelEngine : MonoBehaviour
             Directory.CreateDirectory(dir);
         }
         var bw = new BinaryWriter(File.Open(dest, FileMode.OpenOrCreate));
-        bw.Write(player.transform.position.x);
-        bw.Write(player.transform.position.y);
-        bw.Write(player.transform.position.z);
+        bw.Write(player.position.x);
+        bw.Write(player.position.y);
+        bw.Write(player.position.z);
+
+        bw.Write(player.rotation.eulerAngles.x);
+        bw.Write(player.rotation.eulerAngles.y);
+
         bw.Write(_player.blocks);
+
         bw.Flush();
         bw.Close();
     }
@@ -221,51 +298,26 @@ public class VoxelEngine : MonoBehaviour
         else
             return false;
     }
-    void Update()
+    private void SetPlayerPosition()
     {
-        if (loadHeightmap)
-            StartCoroutine(WaitForHeightmap());
-        if (loadChunks)
-            StartCoroutine(WaitForLoadChunks());
-        if (!playerSet && setPlayer)
+        if (Physics.Raycast(player.position, Vector3.down, out RaycastHit _hit))
         {
-            /* FOR ENABLING/DISABLING PLAYER MOVEMENT */
-            if ((player = GameObject.FindWithTag("Player")) != null)
-                player.GetComponent<Movement>().enabled = true;
-            playerSet = true;
-            spawnEntity = true;
-            if (Physics.Raycast(player.transform.position, Vector3.down, out RaycastHit _hit))
+            if (player != null)
             {
-                player.transform.position = _hit.point + new Vector3(0f, 0.5f, 0f);
-            }
-        }
-        //SWITCHING NOCLIP/PLAYER MOVEMENT
-        /*
-        if (playerSet && Input.GetKeyUp(KeyCode.F))
-        {
-            if(player.GetComponent<Player>().isCreative)
-            {
-                player.transform.position = _camera.transform.position;
-                player.transform.rotation = _camera.transform.rotation;
-                player.GetComponent<Player>().isCreative = false;
                 player.GetComponent<Movement>().enabled = true;
-                player.GetComponent<CharacterController>().enabled = true;
-                _camera.GetComponent<FreeCam>().enabled = false;
+                if (!playerLoaded)
+                {
+                    player.position = _hit.point + new Vector3(0f, 0.5f, 0f);
+                }
+                playerSet = true;
             }
             else
-            {
-                player.GetComponent<Player>().isCreative = true;
-                player.GetComponent<Movement>().enabled = false;
-                player.GetComponent<CharacterController>().enabled = false;
-                _camera.GetComponent<FreeCam>().enabled = true;
-            }
-        }*/
-        //SPAWNING ENTITIES
-        if (playerSet && spawnEntity && entityCount <= 5)
-        {
-            StartCoroutine(SpawnEntity(Sheep));
+                Debug.Log("No player found!");
         }
-        var ray = _camera.ScreenPointToRay(Input.mousePosition);
+    }
+    private void MiningPlacingBlocks()
+    {
+        var ray = cam.ScreenPointToRay(Input.mousePosition);
         float axis = Input.GetAxis("Mouse ScrollWheel");
         if (axis != 0 && !EmptyArray(_player.blocks))
         {
@@ -353,21 +405,13 @@ public class VoxelEngine : MonoBehaviour
         {
             _selectSquare.SetActive(false);
         }
-        if (Input.GetKeyUp(KeyCode.G))
-        {
-            StopAllCoroutines();
-            ClearAllChunks();
-            ClearAllHeightmaps();
-            FindNewSeed();
-            loadHeightmap = true;
-        }
     }
 
     private void UnloadChunks()
     {
         foreach (KeyValuePair<ChunkId, Chunk> chunk in world.Chunks)
         {
-            Vector3 pos = new Vector3(playerPos.position.x, 0f, playerPos.position.z);
+            Vector3 pos = new Vector3(player.position.x, 0f, player.position.z);
             if (Vector3.Distance(pos, chunk.Value.gameObject.transform.position) > distanceToUnload)
             {
                 world.Chunks.Remove(chunk.Key);
@@ -376,48 +420,65 @@ public class VoxelEngine : MonoBehaviour
             }
         }
     }
-    private IEnumerator WaitForLoadChunks()
+    private void AddChunk(int x1, int z1)
+    {
+        int x = (int)RoundDown(x1, 16) / 16;
+        int z = (int)RoundDown(z1, 16) / 16;
+        var chunkGameObject = new GameObject($"Chunk {x}, {z}")
+        { tag = "Chunk" };
+        chunkGameObject.transform.parent = transform;
+        chunkGameObject.transform.position = new Vector3(x * chunkWidth, 0, z * chunkWidth);
+        var chunk = chunkGameObject.AddComponent<Chunk>();
+        world.Chunks.Add(new ChunkId(x, z), chunk);
+    }
+    private IEnumerator WaitForLoadChunks(float delay)
     {
         loadChunks = false;
-        int x = (int)RoundDown((long)playerPos.position.x, 16) + 8;
-        int z = (int)RoundDown((long)playerPos.position.z, 16) + 8;
-        for (int i = 0; i <= renderDistance * 16; i += 8)
+        yield return new WaitForSeconds(delay);
+        int x = (int)RoundDown((long)player.position.x, 16) + 8;
+        int z = (int)RoundDown((long)player.position.z, 16) + 8;
+        for (int i = 0; i <= distanceToLoad; i += 8)
         {
             if (i == 0)
             {
-                if (!world.Chunks.ContainsKey(ChunkId.FromWorldPos(x, z)))
-                    LoadChunks(x, z);
+                if (world.Heightmaps.ContainsKey(HeightmapId.FromWorldPos(x, z)) && world.Heightmaps[HeightmapId.FromWorldPos(x, z)].IsDone && !world.Chunks.ContainsKey(ChunkId.FromWorldPos(x, z)))
+                {
+                    AddChunk(x, z);
+
+                }
             }
             else
             {
                 double radius = Mathf.Sqrt(i * i + i * i);
-                for (int j = 0; j <= 360; j += 10)
+                for (int j = 0; j <= 360; j += 5)
                 {
-                    double x1 = x + radius * Mathf.Cos(j * Mathf.PI / 180f);
-                    double z1 = z + radius * Mathf.Sin(j * Mathf.PI / 180f);
-                    if (!world.Chunks.ContainsKey(ChunkId.FromWorldPos((int)x1, (int)z1)))
+                    int x1 = (int)(x + radius * Mathf.Cos(j * Mathf.PI / 180f));
+                    int z1 = (int)(z + radius * Mathf.Sin(j * Mathf.PI / 180f));
+                    if (world.Heightmaps.ContainsKey(HeightmapId.FromWorldPos(x1, z1)) && world.Heightmaps[HeightmapId.FromWorldPos(x1, z1)].IsDone && !world.Chunks.ContainsKey(ChunkId.FromWorldPos(x1, z1)))
                     {
-                        LoadChunks((int)x1, (int)z1);
+                        AddChunk(x1, z1);
                         yield return new WaitForEndOfFrame();
                     }
                 }
             }
+
         }
+        yield return new WaitForSeconds(1f);
         loadChunks = true;
     }
-
     private IEnumerator WaitForHeightmap()
     {
         loadHeightmap = false;
-        int _x = (int)RoundDown((long)playerPos.position.x, 128);
-        int _z = (int)RoundDown((long)playerPos.position.z, 128);
+        int _x = (int)RoundDown((long)player.position.x, 128);
+        int _z = (int)RoundDown((long)player.position.z, 128);
         if (heightmapDistance == 0)
         {
-            if (!world.Heightmap.ContainsKey(HeightmapId.FromWorldPos(_x, _z)))
+            if (!world.Heightmaps.ContainsKey(HeightmapId.FromWorldPos(_x, _z)))
             {
-                yield return new WaitForEndOfFrame();
-                Heightmap hm = new Heightmap(_x, _z);
-                world.Heightmap.Add(HeightmapId.FromWorldPos(_x, _z), hm);
+                Heightmap hm = new Heightmap(_x, _z, seed);
+                world.Heightmaps.Add(HeightmapId.FromWorldPos(_x, _z), hm);
+                yield return StartCoroutine(hm.WaitFor());
+                hm.SaveData();
             }
         }
         else
@@ -426,53 +487,18 @@ public class VoxelEngine : MonoBehaviour
             {
                 for (int j = -heightmapDistance; j <= heightmapDistance; j++)
                 {
-                    if (!world.Heightmap.ContainsKey(HeightmapId.FromWorldPos(_x + (i * 128), _z + (j * 128))))
+                    if (!world.Heightmaps.ContainsKey(HeightmapId.FromWorldPos(_x + (i * 128), _z + (j * 128))))
                     {
-                        yield return new WaitForEndOfFrame();
-                        Heightmap hm = new Heightmap(_x + (i * 128), _z + (j * 128));
-                        world.Heightmap.Add(HeightmapId.FromWorldPos(_x + (i * 128), _z + (j * 128)), hm);
+                        Heightmap hm = new(_x + (i * 128), _z + (j * 128), seed);
+                        world.Heightmaps.Add(HeightmapId.FromWorldPos(_x + (i * 128), _z + (j * 128)), hm);
+                        yield return StartCoroutine(hm.WaitFor());
+                        hm.SaveData();
                     }
                 }
             }
         }
-        loadChunks = true;
-        yield return new WaitForSeconds(0.5f);
+        yield return new WaitForSeconds(1f);
         loadHeightmap = true;
-        setPlayer = true;
-    }
-
-    private void LoadChunks(int x1, int z1)
-    {
-        int _x = (int)RoundDown(x1, 16);
-        int _z = (int)RoundDown(z1, 16);
-        AddChunk(_x / 16, _z / 16);
-    }
-
-    private void AddChunk(int x, int z)
-    {
-        var chunkGameObject = new GameObject($"Chunk {x}, {z}")
-        { tag = "Chunk" };
-        chunkGameObject.transform.parent = transform;
-        chunkGameObject.transform.position = new Vector3(x * chunkSize, 0, z * chunkSize);
-        var chunk = chunkGameObject.AddComponent<Chunk>();
-        world.Chunks.Add(new ChunkId(x, z), chunk);
-        world.SetChunkDirty(x * 16, z * 16, true);
-    }
-    private void FindNewSeed()
-    {
-        WorldSeed = seed;
-    }
-    private void ClearAllHeightmaps()
-    {
-        world.Heightmap.Clear();
-    }
-    private void ClearAllChunks()
-    {
-        foreach (KeyValuePair<ChunkId, Chunk> chunk in world.Chunks)
-        {
-            Destroy(chunk.Value.gameObject);
-        }
-        world.Chunks.Clear();
     }
     long RoundDown(long n, long m)
     {
@@ -481,38 +507,5 @@ public class VoxelEngine : MonoBehaviour
     long RoundUp(long n, long m)
     {
         return n >= 0 ? ((n + m - 1) / m) * m : (n / m) * m;
-    }
-    private async void GenerateHeightmaps()
-    {
-        loadHeightmap = false;
-        int _x = (int)RoundDown((long)playerPos.position.x, 128);
-        int _z = (int)RoundDown((long)playerPos.position.z, 128);
-        for (int i = -heightmapDistance; i <= heightmapDistance; i++)
-        {
-            for (int j = -heightmapDistance; j <= heightmapDistance; j++)
-            {
-                if (!world.Heightmap.ContainsKey(HeightmapId.FromWorldPos(_x + (i * 128), _z + (j * 128))))
-                {
-                    //await Task.Delay(5);
-                    //await Task.Run(() => GenerateHeightmap(_x, _z, i, j));
-                    await Task.Delay(5);
-                    GenerateHeightmap(_x, _z, i, j);
-
-                    //GenerateHeightmap(_x, _z, i ,j);
-                    //await Task.Run(GenerateHeightmap());
-                    //Heightmap hm = new Heightmap(_x + (i * 128), _z + (j * 128));
-                    //world.Heightmap.Add(HeightmapId.FromWorldPos(_x + (i * 128), _z + (j * 128)), hm);
-                    //yield return new WaitForEndOfFrame();
-                }
-            }
-        }
-        //loadChunks = true;
-        loadHeightmap = true;
-    }
-    private void GenerateHeightmap(int _x, int _z, int i, int j)
-    {
-        Heightmap hm = new Heightmap(_x + (i * 128), _z + (j * 128));
-        world.Heightmap.Add(HeightmapId.FromWorldPos(_x + (i * 128), _z + (j * 128)), hm);
-        loadChunks = true;
     }
 }
