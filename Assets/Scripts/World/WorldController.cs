@@ -2,15 +2,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using Unity.AI.Navigation;
 using UnityEngine.U2D;
 using System.Linq;
 using System.IO;
-using TMPro;
-
-public class VoxelEngine : MonoBehaviour
+public class WorldController : MonoBehaviour
 {
     public World world = new();
-
     [Header("Materials")]
     public Material opaqueMat;
     public Material waterMat;
@@ -23,19 +21,6 @@ public class VoxelEngine : MonoBehaviour
     public Image blockImage;
     public Text blockText;
     public Text blockAmount;
-
-    [Header("Debug menu")]
-    public GameObject debugPanel;
-    public TMP_Text coordsPointingText;
-    public TMP_Text blockPointingText;
-    public TMP_Text biomPointingText;
-
-    public TMP_Text coordsStandingText;
-    public TMP_Text blockStandingText;
-    public TMP_Text biomStandingText;
-
-    public TMP_Text chunkText;
-    private bool debugEnabled = false;
 
     [Header("World settings")]
     public int heightmapDistance;
@@ -51,18 +36,19 @@ public class VoxelEngine : MonoBehaviour
     public float miningDistance;
     public GameObject selectSquare;
     public GameObject waterPanel;
+
     //Private player variables
     private GameObject _selectSquare;
-
     private Transform player;
     private Player _player;
     private Movement _movement;
     private Camera cam;
-
     private bool playerSet = false;
     private bool playerLoaded = false;
 
     [Header("Entities")]
+    public NavMeshSurface navMesh;
+    private bool buildNav = true;
     private int entityCount;
     public GameObject Sheep;
 
@@ -96,7 +82,10 @@ public class VoxelEngine : MonoBehaviour
         if (loadHeightmap)
             StartCoroutine(WaitForHeightmap());
         if (loadChunks)
-            StartCoroutine(WaitForLoadChunks(1f));
+            StartCoroutine(WaitForLoadChunks(0f));
+
+        if (spawnEntity && entityCount <= 5)
+            StartCoroutine(SpawnEntity(Sheep, 5f));
 
         if (!playerSet)
             SetPlayerPosition();
@@ -105,11 +94,6 @@ public class VoxelEngine : MonoBehaviour
     }
     private void LateUpdate()
     {
-        if (Input.GetKeyDown(KeyCode.H))
-        {
-            debugEnabled = !debugEnabled;
-        }
-        UpdateDebug();
         UnloadChunks();
     }
     private void FixedUpdate()
@@ -149,63 +133,6 @@ public class VoxelEngine : MonoBehaviour
         }
         return false;
     }
-    private void UpdateDebug()
-    {
-        if (debugEnabled)
-        {
-            debugPanel.SetActive(true);
-            //Getting block coords player is pointing at
-            var ray = cam.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit))
-            {
-                if (hit.collider.tag == "Chunk")
-                {
-                    var p = hit.point - (hit.normal / 2f);
-                    int _x = Mathf.FloorToInt(p.x);
-                    int _y = Mathf.FloorToInt(p.y);
-                    int _z = Mathf.FloorToInt(p.z);
-                    coordsPointingText.text = "x: " + _x + " y: " + _y + " z: " + _z;
-                    ushort id = world[_x, _y, _z];
-                    ushort biom = world[_x, _z];
-                    blockPointingText.text = Enums.GetBlockName(id) + " ID[" + id + "]";
-                    biomPointingText.text = Enums.GetBiomName(biom) + " ID[" + biom + "]";
-                }
-            }
-            else
-            {
-                coordsPointingText.text = "";
-                biomPointingText.text = "";
-                blockPointingText.text = "";
-            }
-            //Getting block coords player is standing on
-            if (Physics.Raycast(player.position, Vector3.down, out RaycastHit _hit))
-            {
-                if (_hit.collider.tag == "Chunk")
-                {
-                    var p = _hit.point - (_hit.normal / 2f);
-                    int _x = Mathf.FloorToInt(p.x);
-                    int _y = Mathf.FloorToInt(p.y);
-                    int _z = Mathf.FloorToInt(p.z);
-                    coordsStandingText.text = "x: " + _x + " y: " + _y + " z: " + _z;
-                    ushort id = world[_x, _y, _z];
-                    ushort biom = world[_x, _z];
-                    blockStandingText.text = Enums.GetBlockName(id) + " ID[" + id + "]";
-                    biomStandingText.text = Enums.GetBiomName(biom) + " ID[" + biom + "]";
-                }
-            }
-            else
-            {
-                coordsStandingText.text = "";
-                biomStandingText.text = "";
-                blockStandingText.text = "";
-            }
-            //Getting chunk info
-            var chunk = world.Chunks[ChunkId.FromWorldPos(Mathf.FloorToInt(player.position.x), Mathf.FloorToInt(player.position.z))];
-            chunkText.text = chunk.name + "\nX: " + chunk.transform.position.x + ", Z: " + chunk.transform.position.z;
-        }
-        else
-            debugPanel.SetActive(false);
-    }
     private void UpdateUI()
     {
         if (!EmptyArray(_player.blocks))
@@ -220,7 +147,7 @@ public class VoxelEngine : MonoBehaviour
             blockBorder.SetActive(false);
         }
     }
-    private IEnumerator SpawnEntity(GameObject gameObject)
+    private IEnumerator SpawnEntity(GameObject gameObject, float delay)
     {
         spawnEntity = false;
         Vector3 position = new Vector3(cam.transform.position.x + Random.Range(-entityDistToLoad, entityDistToLoad), 200, cam.transform.position.z + Random.Range(-entityDistToLoad, entityDistToLoad));
@@ -234,7 +161,7 @@ public class VoxelEngine : MonoBehaviour
                 entityCount++;
             }
         }
-        yield return new WaitForSeconds(5f);
+        yield return new WaitForSeconds(delay);
         spawnEntity = true;
     }
     private void OnApplicationQuit() //Saving player data on application quit 
@@ -323,6 +250,7 @@ public class VoxelEngine : MonoBehaviour
                     }
                 }
                 player.GetComponent<Movement>().enabled = true;
+                //spawnEntity = true;
                 playerSet = true;
             }
             else
@@ -451,6 +379,7 @@ public class VoxelEngine : MonoBehaviour
         yield return new WaitForSeconds(delay);
         int x = (int)RoundDown((long)player.position.x, 16) + 8;
         int z = (int)RoundDown((long)player.position.z, 16) + 8;
+        int playerAngle = 360 - ((int)player.rotation.eulerAngles.y);
         for (int i = 0; i <= distanceToLoad; i += 8)
         {
             if (i == 0)
@@ -458,12 +387,28 @@ public class VoxelEngine : MonoBehaviour
                 if (world.Heightmaps.ContainsKey(HeightmapId.FromWorldPos(x, z)) && world.Heightmaps[HeightmapId.FromWorldPos(x, z)].IsDone && !world.Chunks.ContainsKey(ChunkId.FromWorldPos(x, z)))
                 {
                     AddChunk(x, z);
+                    if (buildNav)
+                    {
+                        yield return new WaitForEndOfFrame();
+                        navMesh.BuildNavMesh();
+                        buildNav = false;
+                    }
                 }
             }
             else
             {
                 double radius = Mathf.Sqrt(i * i + i * i);
-                for (int j = 0; j <= 360; j += 5)
+                for (int j = playerAngle; j <= playerAngle + 180; j += 5)
+                {
+                    int x1 = (int)(x + radius * Mathf.Cos(j * Mathf.PI / 180f));
+                    int z1 = (int)(z + radius * Mathf.Sin(j * Mathf.PI / 180f));
+                    if (world.Heightmaps.ContainsKey(HeightmapId.FromWorldPos(x1, z1)) && world.Heightmaps[HeightmapId.FromWorldPos(x1, z1)].IsDone && !world.Chunks.ContainsKey(ChunkId.FromWorldPos(x1, z1)))
+                    {
+                        AddChunk(x1, z1);
+                        yield return new WaitForEndOfFrame();
+                    }
+                }
+                for (int j = playerAngle + 180; j <= playerAngle + 360; j += 5)
                 {
                     int x1 = (int)(x + radius * Mathf.Cos(j * Mathf.PI / 180f));
                     int z1 = (int)(z + radius * Mathf.Sin(j * Mathf.PI / 180f));
@@ -475,6 +420,7 @@ public class VoxelEngine : MonoBehaviour
                 }
             }
         }
+        navMesh.UpdateNavMesh(navMesh.navMeshData);
         yield return new WaitForSeconds(1f);
         loadChunks = true;
     }
