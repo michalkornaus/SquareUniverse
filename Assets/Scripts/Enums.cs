@@ -1,4 +1,4 @@
-public enum Blocks : byte
+public enum Blocks : ushort
 {
     Air = 0,
     Grass = 1,
@@ -19,7 +19,7 @@ public enum Blocks : byte
     Workbench = 16,
     Furnace = 17,
 }
-public enum Bioms : byte
+public enum Bioms
 {
     RockyHills = 1,
     Grass = 2,
@@ -87,6 +87,6 @@ public class Enums
             default:
                 return "Null";
         }
-                                        
+
     }
 }

@@ -4,14 +4,14 @@ public class World
 {
     public Dictionary<ChunkId, Chunk> Chunks = new Dictionary<ChunkId, Chunk>();
     public Dictionary<HeightmapId, Heightmap> Heightmaps = new Dictionary<HeightmapId, Heightmap>();
-    public byte this[int x, int y, int z]
+    public ushort this[int x, int y, int z]
     {
         get
         {
             if (Chunks.TryGetValue(ChunkId.FromWorldPos(x, z), out Chunk _chunk))
                 return _chunk[x & 0xF, y, z & 0xF];
             else
-                return 0;
+                return 3;
         }
         set
         {

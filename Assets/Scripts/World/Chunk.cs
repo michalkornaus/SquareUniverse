@@ -11,10 +11,10 @@ public class Chunk : MonoBehaviour
     //CHUNK HEIGHT = 128
     private static readonly int heightmapSize = 128;
     private static readonly int chunkWidth = 16;
-    private static readonly int chunkHeight = 128;
+    private static readonly int chunkHeight = 256;
 
-    public byte[] Cubes = new byte[chunkHeight * chunkWidth * chunkWidth];
-    public byte this[int x, int y, int z]
+    public ushort[] Cubes = new ushort[chunkHeight * chunkWidth * chunkWidth];
+    public ushort this[int x, int y, int z]
     {
         get { return Cubes[x * chunkHeight * chunkWidth + y * chunkWidth + z]; }
         set { Cubes[x * chunkHeight * chunkWidth + y * chunkWidth + z] = value; }
@@ -190,14 +190,14 @@ public class Chunk : MonoBehaviour
                 for (var z = 0; z < chunkWidth; z++)
                 {
                     var voxelType = this[x, y, z];
-                    if (voxelType == (byte)Blocks.Air)
+                    if (voxelType == (ushort)Blocks.Air)
                         continue;
                     var _cubeTriangles = CalcTriangleFaces(x, y, z);
                     if (_cubeTriangles.Count == 0)
                         continue;
                     var pos = new Vector3(x, y, z);
                     var verticesPos = vertices.Count;
-                    if (voxelType == (byte)Blocks.Water && this[x, y + 1, z] == (byte)Blocks.Air)
+                    if (voxelType == (ushort)Blocks.Water && this[x, y + 1, z] == (ushort)Blocks.Air)
                     {
                         foreach (var vert in _waterVertices)
                             vertices.Add(pos + vert);
@@ -209,9 +209,9 @@ public class Chunk : MonoBehaviour
                     }
                     foreach (var tri in _cubeTriangles)
                     {
-                        if (voxelType == (byte)Blocks.Water)
+                        if (voxelType == (ushort)Blocks.Water)
                         { waterTriangles.Add(tri + verticesPos); }
-                        else if (voxelType == (byte)Blocks.FancyLeaves || voxelType == (byte)Blocks.Glass)
+                        else if (voxelType == (ushort)Blocks.FancyLeaves || voxelType == (ushort)Blocks.Glass)
                         { transparentTriangles.Add(tri + verticesPos); }
                         else
                         { opaqueTriangles.Add(tri + verticesPos); }
@@ -340,7 +340,7 @@ public class Chunk : MonoBehaviour
         collisionMesh.Optimize();
         _meshCollider.sharedMesh = collisionMesh;
     }
-    private void AddRange(ref List<int> triangles, byte _this, byte other, string quad)
+    private void AddRange(ref List<int> triangles, ushort _this, ushort other, string quad)
     {
         if (other == 0 || other == 7 || other == 12 || other == 13)
         {
@@ -460,7 +460,7 @@ public class Chunk : MonoBehaviour
         //Bottom
         if (y > 0)
         {
-            byte below = this[x, y - 1, z];
+            ushort below = this[x, y - 1, z];
             AddRange(ref triangles, this[x, y, z], below, "Bottom");
         }
         else
@@ -469,7 +469,7 @@ public class Chunk : MonoBehaviour
         //Top
         if (y < chunkHeight - 1)
         {
-            byte above = this[x, y + 1, z];
+            ushort above = this[x, y + 1, z];
             AddRange(ref triangles, this[x, y, z], above, "Top");
         }
         else
@@ -478,48 +478,48 @@ public class Chunk : MonoBehaviour
         //Left
         if (x > 0)
         {
-            byte left = this[x - 1, y, z];
+            ushort left = this[x - 1, y, z];
             AddRange(ref triangles, this[x, y, z], left, "Left");
         }
         else
         {
-            byte value = _voxelEngine.world[(int)transform.position.x - 1, y, (int)transform.position.z + z];
+            ushort value = _voxelEngine.world[(int)transform.position.x - 1, y, (int)transform.position.z + z];
             AddRange(ref triangles, this[x, y, z], value, "Left");
         }
 
         //Right
         if (x < chunkWidth - 1)
         {
-            byte right = this[x + 1, y, z];
+            ushort right = this[x + 1, y, z];
             AddRange(ref triangles, this[x, y, z], right, "Right");
         }
         else
         {
-            byte value = _voxelEngine.world[(int)transform.position.x + chunkWidth, y, (int)transform.position.z + z];
+            ushort value = _voxelEngine.world[(int)transform.position.x + chunkWidth, y, (int)transform.position.z + z];
             AddRange(ref triangles, this[x, y, z], value, "Right");
         }
 
         //Back
         if (z > 0)
         {
-            byte back = this[x, y, z - 1];
+            ushort back = this[x, y, z - 1];
             AddRange(ref triangles, this[x, y, z], back, "Back");
         }
         else
         {
-            byte value = _voxelEngine.world[(int)transform.position.x + x, y, (int)transform.position.z - 1];
+            ushort value = _voxelEngine.world[(int)transform.position.x + x, y, (int)transform.position.z - 1];
             AddRange(ref triangles, this[x, y, z], value, "Back");
         }
 
         //Front
         if (z < chunkWidth - 1)
         {
-            byte front = this[x, y, z + 1];
+            ushort front = this[x, y, z + 1];
             AddRange(ref triangles, this[x, y, z], front, "Front");
         }
         else
         {
-            byte value = _voxelEngine.world[(int)transform.position.x + x, y, (int)transform.position.z + chunkWidth];
+            ushort value = _voxelEngine.world[(int)transform.position.x + x, y, (int)transform.position.z + chunkWidth];
             AddRange(ref triangles, this[x, y, z], value, "Front");
         }
 

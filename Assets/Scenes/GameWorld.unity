@@ -440,8 +440,8 @@ MonoBehaviour:
   biomStandingText: {fileID: 1244226739}
   chunkText: {fileID: 1584522280}
   heightmapDistance: 1
-  seed: 5000
-  renderDistance: 8
+  seed: 5
+  renderDistance: 6
   miningDistance: 5
   selectSquare: {fileID: 5212950569851148389, guid: 6ea85dede70a50242ab362cfceaccf7c,
     type: 3}
@@ -847,7 +847,7 @@ PrefabInstance:
     - target: {fileID: 4652611953745217039, guid: ba13952d501bc354fb42b1e224ee4005,
         type: 3}
       propertyPath: playmode
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ba13952d501bc354fb42b1e224ee4005, type: 3}

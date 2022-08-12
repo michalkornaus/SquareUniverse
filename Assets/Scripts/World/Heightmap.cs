@@ -19,7 +19,9 @@ public class Heightmap : MultiThreading.ThreadedJob
     private static readonly int chunkWidth = 16;
     private static readonly int chunkCount = 64;
     private static readonly int heightmapSize = 128;
-    private static readonly int chunkHeight = 128;
+    private static readonly int chunkHeight = 256;
+
+    private static readonly int waterLevel = 50;
 
     private static readonly float scale1 = 10f;
     private static readonly float scale2 = 15f;
@@ -33,20 +35,25 @@ public class Heightmap : MultiThreading.ThreadedJob
     private readonly float threshold;
     private readonly int ground = 3;
     private int seed;
-
     private Vector2 position;
-    //Cubes - Max 2 097 152
-    public byte[] Cubes = new byte[chunkHeight * chunkWidth * chunkWidth * chunkCount];
+
+    //FOR 128 HEIGHT Cubes - Max 2 097 152 cubes (one cube = 2 bytes) / size of 4 194 304 bytes
+    public ushort[] Cubes = new ushort[chunkHeight * chunkWidth * chunkWidth * chunkCount];
+    //FOR 128 HEIGHT _cubes - cubes / size of 4 194 304 bytes
+    private byte[] _cubes = new byte[chunkHeight * chunkWidth * chunkWidth * chunkCount * sizeof(ushort)];
+    private static readonly int cubesSize = chunkHeight * chunkWidth * chunkWidth * chunkCount;
+    private int length;
     //CubesBioms - Max 16384
     public byte[] CubesBioms = new byte[chunkWidth * chunkWidth * chunkCount];
+    private static readonly int biomsSize = chunkCount * chunkWidth * chunkWidth;
 
     public Heightmap(int x, int z, int seed)
     {
         threshold1 = (Mathf.Pow(height1, power1) * 0.55f);
         threshold2 = (Mathf.Pow(height2, power2) * 0.52f);
         threshold = (threshold1 + threshold2) / 2f;
-        //x - 0, 128, -128... : z - 0, 128, -128...
         this.seed = seed;
+        length = cubesSize * sizeof(ushort);
         position = new Vector2(x, z);
         SetSeeds();
         if (!LoadData((int)position.x, (int)position.y))
@@ -63,10 +70,11 @@ public class Heightmap : MultiThreading.ThreadedJob
             FileStream fs = new FileStream(dest, FileMode.Open);
             GZipStream dcmp = new GZipStream(fs, CompressionMode.Decompress);
             var br = new BinaryReader(dcmp);
-            Cubes = br.ReadBytes(2097152);
-            CubesBioms = br.ReadBytes(16384);
 
-            //Buffer.BlockCopy(packetBytes, readPosition, shortSamples, 0, payloadLength);
+            _cubes = br.ReadBytes(length);
+            Buffer.BlockCopy(_cubes, 0, Cubes, 0, length);
+
+            CubesBioms = br.ReadBytes(biomsSize);
 
             br.Close();
             fs.Close();
@@ -88,21 +96,21 @@ public class Heightmap : MultiThreading.ThreadedJob
         GZipStream cmp = new GZipStream(fs, CompressionMode.Compress);
         var bw = new BinaryWriter(cmp);
 
-        bw.Write(Cubes);
-        bw.Write(CubesBioms);
+        Buffer.BlockCopy(Cubes, 0, _cubes, 0, length);
+        bw.Write(_cubes);
 
-        //Buffer.BlockCopy(shortSamples, 0, packetBytes, 0, shortSamples.Length * sizeof(short)). 
+        bw.Write(CubesBioms);
 
         bw.Flush();
         bw.Close();
         fs.Close();
     }
-    public byte this[int x, int y, int z]
+    public ushort this[int x, int y, int z]
     {
-        //x - 2 080 768   y -     z - 127
-        get { return Cubes[x * heightmapSize * heightmapSize + y * chunkHeight + z]; }
-        //x 2 080 768 + y 16256 z + 127 = 2 097 151
-        set { Cubes[x * heightmapSize * heightmapSize + y * chunkHeight + z] = value; }
+        //FOR 128 HEIGHT x - 2 080 768   y -     z - 127
+        get { return Cubes[x * chunkHeight * heightmapSize + y * heightmapSize + z]; }
+        //FOR 128 HEIGHT x 2 080 768 + y 16256 z + 127 = 2 097 151
+        set { Cubes[x * chunkHeight * heightmapSize + y * heightmapSize + z] = value; }
     }
     public byte this[int x, int z]
     {
@@ -110,16 +118,16 @@ public class Heightmap : MultiThreading.ThreadedJob
         set { CubesBioms[x * heightmapSize + z] = value; }
     }
 
-    public byte[] ReturnCubes(int posX, int posZ)
+    public ushort[] ReturnCubes(int posX, int posZ)
     {
-        byte[] p = new byte[128 * 16 * 16];
+        ushort[] p = new ushort[chunkHeight * chunkWidth * chunkWidth];
         for (int x = 0; x < chunkWidth; x++)
         {
             for (int z = 0; z < chunkWidth; z++)
             {
                 for (int y = 0; y < chunkHeight; y++)
                 {
-                    p[x * 128 * 16 + y * 16 + z] = this[x + posX, y, z + posZ];
+                    p[x * chunkHeight * chunkWidth + y * chunkWidth + z] = this[x + posX, y, z + posZ];
                 }
             }
         }
@@ -165,10 +173,10 @@ public class Heightmap : MultiThreading.ThreadedJob
                 double z1 = z / (double)heightmapSize - 1;
                 byte biom = this[x, z];
                 double value = (HeightNoise.Get(x1 + posX, z1 + posZ) + BaseHNoise.Get(x1 + posX, z1 + posZ)) / 2f;
-                value = Remap((float)value, -1, 1, 0, 0.98f);
+                value = Remap((float)value, -1, 1, 0.01f, 0.98f);
                 value *= heightmapSize;
-                int stone = (int)value + 15;
-                int _max = Mathf.Max(stone + ground + 3, 36);
+                int stone = (int)value + 30;
+                int _max = Mathf.Max(stone + ground + 3, waterLevel);
                 _max = Mathf.Min(_max, chunkHeight);
                 for (int y = 0; y < _max; y++)
                 {
@@ -184,7 +192,7 @@ public class Heightmap : MultiThreading.ThreadedJob
                     }
                     else
                     {
-                        if (y > stone + ground + 1 && y <= 35)
+                        if (y > stone + ground + 1 && y <= waterLevel - 1)
                         {
                             this[x, y, z] = 7;
                         }
@@ -192,9 +200,9 @@ public class Heightmap : MultiThreading.ThreadedJob
                         {
                             if (y <= ground + stone)
                             {
-                                if (y <= 36)
+                                if (y <= waterLevel)
                                     this[x, y, z] = 4;
-                                else if (y <= _max && y > 36)
+                                else if (y <= _max && y > waterLevel)
                                 {
                                     switch (biom)
                                     {
@@ -209,9 +217,9 @@ public class Heightmap : MultiThreading.ThreadedJob
                             }
                             else if (y <= ground + stone + 1)
                             {
-                                if (y <= 36)
+                                if (y <= waterLevel)
                                     this[x, y, z] = 4;
-                                else if (y <= _max && y > 36)
+                                else if (y <= _max && y > waterLevel)
                                 {
                                     switch (biom)
                                     {
@@ -238,14 +246,14 @@ public class Heightmap : MultiThreading.ThreadedJob
                                     }
                                 }
                             }
-                            /*
-                            else if (y <= ground + stone + 2 && biom == 2 && y > 38 && y < 90)
+
+                            else if (y <= ground + stone + 2 && biom == (byte)Bioms.Grass && y > waterLevel + 2 && y < 90)
                             {
                                 if (CanSpawnTree(x, y, z, x1 + posX, z1 + posZ, out double _value))
                                 {
                                     SpawnTree(x, y, z, _value);
                                 }
-                            }*/
+                            }
                         }
                     }
                     /*

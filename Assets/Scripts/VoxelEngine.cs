@@ -96,7 +96,7 @@ public class VoxelEngine : MonoBehaviour
         if (loadHeightmap)
             StartCoroutine(WaitForHeightmap());
         if (loadChunks)
-            StartCoroutine(WaitForLoadChunks(0.5f));
+            StartCoroutine(WaitForLoadChunks(1f));
 
         if (!playerSet)
             SetPlayerPosition();
@@ -125,21 +125,24 @@ public class VoxelEngine : MonoBehaviour
         positions[1] = new Vector3(player.position.x - radius, player.position.y - heightOffset, player.position.z);
         positions[2] = new Vector3(player.position.x, player.position.y - heightOffset, player.position.z + radius);
         positions[3] = new Vector3(player.position.x, player.position.y - heightOffset, player.position.z - radius);
-        _movement.SetPlayerInWater(PlayerInWater(positions));
+        if (player.position.y > 0 && player.position.y < 255)
+        {
+            _movement.SetPlayerInWater(PlayerInWater(positions));
 
-        int _x = Mathf.FloorToInt(cam.transform.position.x);
-        int _y = Mathf.FloorToInt(cam.transform.position.y);
-        int _z = Mathf.FloorToInt(cam.transform.position.z);
-        if (world[_x, _y, _z] == (byte)Blocks.Water)
-            waterPanel.SetActive(true);
-        else
-            waterPanel.SetActive(false);
+            int _x = Mathf.FloorToInt(cam.transform.position.x);
+            int _y = Mathf.FloorToInt(cam.transform.position.y);
+            int _z = Mathf.FloorToInt(cam.transform.position.z);
+            if (world[_x, _y, _z] == (ushort)Blocks.Water)
+                waterPanel.SetActive(true);
+            else
+                waterPanel.SetActive(false);
+        }
     }
     private bool PlayerInWater(Vector3[] pos)
     {
         for (int i = 0; i < pos.Length; i++)
         {
-            if (world[Mathf.FloorToInt(pos[i].x), Mathf.FloorToInt(pos[i].y), Mathf.FloorToInt(pos[i].z)] == (byte)Blocks.Water)
+            if (world[Mathf.FloorToInt(pos[i].x), Mathf.FloorToInt(pos[i].y), Mathf.FloorToInt(pos[i].z)] == (ushort)Blocks.Water)
             {
                 return true;
             }
@@ -162,8 +165,8 @@ public class VoxelEngine : MonoBehaviour
                     int _y = Mathf.FloorToInt(p.y);
                     int _z = Mathf.FloorToInt(p.z);
                     coordsPointingText.text = "x: " + _x + " y: " + _y + " z: " + _z;
-                    byte id = world[_x, _y, _z];
-                    byte biom = world[_x, _z];
+                    ushort id = world[_x, _y, _z];
+                    ushort biom = world[_x, _z];
                     blockPointingText.text = Enums.GetBlockName(id) + " ID[" + id + "]";
                     biomPointingText.text = Enums.GetBiomName(biom) + " ID[" + biom + "]";
                 }
@@ -184,8 +187,8 @@ public class VoxelEngine : MonoBehaviour
                     int _y = Mathf.FloorToInt(p.y);
                     int _z = Mathf.FloorToInt(p.z);
                     coordsStandingText.text = "x: " + _x + " y: " + _y + " z: " + _z;
-                    byte id = world[_x, _y, _z];
-                    byte biom = world[_x, _z];
+                    ushort id = world[_x, _y, _z];
+                    ushort biom = world[_x, _z];
                     blockStandingText.text = Enums.GetBlockName(id) + " ID[" + id + "]";
                     biomStandingText.text = Enums.GetBiomName(biom) + " ID[" + biom + "]";
                 }
@@ -257,7 +260,9 @@ public class VoxelEngine : MonoBehaviour
             player.position = new Vector3(_x, _y, _z);
             cam.GetComponent<PlayerCamera>().SetRotation(_xR);
             player.GetComponent<Movement>().SetRotation(_yR);
+
             _player.blocks = br.ReadBytes(20);
+
             br.Close();
             return true;
         }
@@ -277,7 +282,7 @@ public class VoxelEngine : MonoBehaviour
         bw.Write(player.position.y);
         bw.Write(player.position.z);
 
-        bw.Write(player.rotation.eulerAngles.x);
+        bw.Write(cam.transform.rotation.eulerAngles.x);
         bw.Write(player.rotation.eulerAngles.y);
 
         bw.Write(_player.blocks);
@@ -304,11 +309,20 @@ public class VoxelEngine : MonoBehaviour
         {
             if (player != null)
             {
-                player.GetComponent<Movement>().enabled = true;
                 if (!playerLoaded)
                 {
-                    player.position = _hit.point + new Vector3(0f, 0.5f, 0f);
+                    if (world[Mathf.FloorToInt(_hit.point.x), Mathf.FloorToInt(_hit.point.y), Mathf.FloorToInt(_hit.point.z)] != (ushort)Blocks.Water)
+                    {
+                        //Spawning player when there is not a water block under him
+                        player.position = _hit.point + new Vector3(0f, 0.5f, 0f);
+                    }
+                    else
+                    { //Else find spot where there is not any water blocks
+                        //Later to code
+                        player.position = _hit.point + new Vector3(0f, 0.5f, 0f);
+                    }
                 }
+                player.GetComponent<Movement>().enabled = true;
                 playerSet = true;
             }
             else
@@ -388,7 +402,7 @@ public class VoxelEngine : MonoBehaviour
                             int y = Mathf.FloorToInt(p.y);
                             int z = Mathf.FloorToInt(p.z);
                             _player.blocks[index]--;
-                            world[x, y, z] = (byte)index;
+                            world[x, y, z] = (ushort)index;
                             world.SetChunkDirty(x, z, false);
                             UpdateUI();
                         }
@@ -444,7 +458,6 @@ public class VoxelEngine : MonoBehaviour
                 if (world.Heightmaps.ContainsKey(HeightmapId.FromWorldPos(x, z)) && world.Heightmaps[HeightmapId.FromWorldPos(x, z)].IsDone && !world.Chunks.ContainsKey(ChunkId.FromWorldPos(x, z)))
                 {
                     AddChunk(x, z);
-
                 }
             }
             else
@@ -461,7 +474,6 @@ public class VoxelEngine : MonoBehaviour
                     }
                 }
             }
-
         }
         yield return new WaitForSeconds(1f);
         loadChunks = true;
