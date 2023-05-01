@@ -6,31 +6,180 @@ public static class Atlas
 {
     //UVS TEXTURES
     private static readonly float UvOffset = 0f;
-    private static readonly int xsize = 128;
-    private static readonly int ysize = 128;
-    private static readonly int xlength = 16;
-    private static readonly int ylength = 16;
+    private static readonly int xsize = 512;
+    private static readonly int ysize = 512;
+    private static readonly int xlength = 32;
+    private static readonly int ylength = 32;
     //Generating UV for all 6 sides
-    public static Vector2[] GetUV(int x, int y)
+    private static Vector2[] GetUV(ushort voxel, int x, int y, int rotation)
     {
-        Vector2[] p = GetUVSide(x, y);
+        x *= 32;
+        y *= 32;
+        switch (voxel)
+        {
+            //Grass
+            case 1:
+                Vector2[] s = GetUVSide(416, 224);
+                Vector2[] t = GetUVSide(x, y);
+                Vector2[] b = GetUVSide(96, 32);
+                return NewUV(b, s, s, s, s, t);
+            //Wooden Log
+            case 5:
+                s = GetUVSide(x, y);
+                Vector2[] _tb = GetUVSide(288, 32);
+                switch (rotation)
+                {
+                    case 0:
+                        return NewUV(_tb, s, s, s, s, _tb);
+                    case 1:
+                        return NewUV(s, _tb, s, s, _tb, s);
+                    case 2:
+                        return NewUV(s, s, _tb, _tb, s, s);
+                    default:
+                        return NewUV(_tb, s, s, s, s, _tb);
+                }
+            //Workbench
+            case 16:
+                Vector2[] tb = GetUVSide(x, y);
+                s = GetUVSide(x + 64, y);
+                return NewUV(tb, s, s, s, s, tb);
+            //Furnace
+            case 17:
+                Vector2[] f = GetUVSide(x, y);
+                s = GetUVSide(x + 128, y);
+                tb = GetUVSide(224, y);
+                switch (rotation)
+                {
+                    case 0:
+                        return NewUV(tb, s, f, s, s, tb);
+                    case 1:
+                        return NewUV(tb, f, s, s, s, tb);
+                    case 2:
+                        return NewUV(tb, s, s, f, s, tb);
+                    case 3:
+                        return NewUV(tb, s, s, s, f, tb);
+                    default:
+                        return NewUV(tb, s, f, s, s, tb);
+                }
+            //Rest of blocks
+            default:
+                s = GetUVSide(x, y);
+                return NewUV(s, s, s, s, s, s);
+        }
+
+    }
+    private static Vector2[] NewUV(Vector2[] bm, Vector2[] l, Vector2[] f, Vector2[] b, Vector2[] r, Vector2[] t)
+    {
         Vector2[] uv = {
-        //Bottom
-        p[1], p[3], p[2], p[0],
-        //Left
-        p[1], p[3], p[2], p[0],
-        // Front 
-        p[1], p[3], p[2], p[0],
-        // Back
-        p[1], p[3], p[2], p[0],
-        // Right
-        p[1], p[3], p[2], p[0],
-        // Top
-        p[1], p[3], p[2], p[0],
-        };
+                //Bottom
+                bm[1], bm[3], bm[2], bm[0],
+                //Left
+                l[1], l[3], l[2], l[0],
+                // Front 
+                f[1], f[3], f[2], f[0],
+                // Back
+                b[1], b[3], b[2], b[0],
+                // Right
+                r[1], r[3], r[2], r[0],
+                // Top
+                t[1], t[3], t[2], t[0],
+                };
         return uv;
     }
-
+    public static void SetUV(ushort voxel, ref List<Vector2> uvs)
+    {
+        int rotation = voxel % 10;
+        voxel /= 10;
+        switch (voxel)
+        {
+            //x, y - 1,3,5 brackets order -> 1,2,3 blocks order
+            //Grass
+            case 1:
+                foreach (var uv in GetUV(1, 1, 1, rotation))
+                    uvs.Add(uv);
+                break;
+            //Dirt 
+            case 2:
+                foreach (var uv in GetUV(2, 3, 1, rotation))
+                    uvs.Add(uv);
+                break;
+            //Stone 
+            case 3:
+                foreach (var uv in GetUV(3, 5, 1, rotation))
+                    uvs.Add(uv);
+                break;
+            //Sand 
+            case 4:
+                foreach (var uv in GetUV(4, 7, 1, rotation))
+                    uvs.Add(uv);
+                break;
+            //WoodenLog 
+            case 5:
+                foreach (var uv in GetUV(5, 11, 1, rotation))
+                    uvs.Add(uv);
+                break;
+            //Leaves 
+            case 6:
+                foreach (var uv in GetUV(6, 13, 1, rotation))
+                    uvs.Add(uv);
+                break;
+            //Water 
+            case 7:
+                foreach (var uv in GetUV(7, 13, 5, rotation))
+                    uvs.Add(uv);
+                break;
+            //Cobblestone
+            case 8:
+                foreach (var uv in GetUV(8, 3, 3, rotation))
+                    uvs.Add(uv);
+                break;
+            //Planks
+            case 9:
+                foreach (var uv in GetUV(9, 1, 3, rotation))
+                    uvs.Add(uv);
+                break;
+            //Clay
+            case 10:
+                foreach (var uv in GetUV(10, 5, 3, rotation))
+                    uvs.Add(uv);
+                break;
+            //Bricks
+            case 11:
+                foreach (var uv in GetUV(11, 7, 3, rotation))
+                    uvs.Add(uv);
+                break;
+            //Glass
+            case 12:
+                foreach (var uv in GetUV(13, 9, 3, rotation))
+                    uvs.Add(uv);
+                break;
+            //Coal ore
+            case 13:
+                foreach (var uv in GetUV(14, 11, 3, rotation))
+                    uvs.Add(uv);
+                break;
+            //Iron ore
+            case 14:
+                foreach (var uv in GetUV(15, 13, 3, rotation))
+                    uvs.Add(uv);
+                break;
+            //Workbench
+            case 15:
+                foreach (var uv in GetUV(16, 9, 5, rotation))
+                    uvs.Add(uv);
+                break;
+            //Furnace
+            case 16:
+                foreach (var uv in GetUV(17, 1, 5, rotation))
+                    uvs.Add(uv);
+                break;
+            //Dirt
+            default:
+                foreach (var uv in GetUV(2, 3, 1, rotation))
+                    uvs.Add(uv);
+                break;
+        }
+    }
     private static Vector2[] GetUVSide(int x, int y)
     {
         float xmin = Mathf.InverseLerp(0f, xsize, x);
@@ -44,93 +193,6 @@ public static class Atlas
         new Vector2(xmax - UvOffset, ymax - UvOffset),
         };
         return uv;
-    }
-    //Generating custom UV for block
-    public static Vector2[] GetCustomUV(int x, int y, int type)
-    {
-        switch (type)
-        {
-            //Grass id:1
-            case 1:
-                Vector2[] s = GetUVSide(x, y);
-                Vector2[] t = GetUVSide(x, y);
-                Vector2[] b = GetUVSide(x + 32, y + 32);
-                Vector2[] uv = {
-                //Bottom
-                b[1], b[3], b[2], b[0],
-                //Left
-                s[1], s[3], s[2], s[0],
-                // Front 
-                s[1], s[3], s[2], s[0],
-                // Back
-                s[1], s[3], s[2], s[0],
-                // Right
-                s[1], s[3], s[2], s[0],
-                // Top
-                t[1], t[3], t[2], t[0],
-                };
-                return uv;
-            //WoodenLog id:5
-            case 2:
-                s = GetUVSide(x, y);
-                Vector2[] tb = GetUVSide(0, 32);
-                uv = new Vector2[] {
-                //Bottom
-                tb[1], tb[3], tb[2], tb[0],
-                //Left
-                s[1], s[3], s[2], s[0],
-                // Front 
-                s[1], s[3], s[2], s[0],
-                // Back
-                s[1], s[3], s[2], s[0],
-                // Right
-                s[1], s[3], s[2], s[0],
-                // Top
-                tb[1], tb[3], tb[2], tb[0],
-                };
-                return uv;
-            //Workbench id:16
-            case 3:
-                s = GetUVSide(x, y - 16);
-                tb = GetUVSide(x, y);
-                uv = new Vector2[] {
-                //Bottom
-                tb[1], tb[3], tb[2], tb[0],
-                //Left
-                s[1], s[3], s[2], s[0],
-                // Front 
-                s[1], s[3], s[2], s[0],
-                // Back
-                s[1], s[3], s[2], s[0],
-                // Right
-                s[1], s[3], s[2], s[0],
-                // Top
-                tb[1], tb[3], tb[2], tb[0],
-                };
-                return uv;
-            //Furnace id:17
-            case 4:
-                Vector2[] f = GetUVSide(x, y);
-                s = GetUVSide(x - 16, y);
-                uv = new Vector2[] {
-                //Bottom
-                s[1], s[3], s[2], s[0],
-                //Left
-                s[1], s[3], s[2], s[0],
-                // Front 
-                f[1], f[3], f[2], f[0],
-                // Back
-                s[1], s[3], s[2], s[0],
-                // Right
-                s[1], s[3], s[2], s[0],
-                // Top
-                s[1], s[3], s[2], s[0],
-                };
-                return uv;
-            //Grass
-            default:
-                return GetCustomUV(x, y, 1);
-        }
     }
 }
 

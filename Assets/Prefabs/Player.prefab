@@ -47,7 +47,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_BackGroundColor: {r: 0.20852618, g: 0.34367862, b: 0.6226415, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -61,7 +61,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.05
-  far clip plane: 1000
+  far clip plane: 350
   field of view: 75
   orthographic: 0
   orthographic size: 5
@@ -119,12 +119,12 @@ MonoBehaviour:
     m_Bits: 512
   stopNaNPropagation: 0
   finalBlitToCameraTarget: 0
-  antialiasingMode: 1
+  antialiasingMode: 3
   temporalAntialiasing:
     jitterSpread: 0.75
-    sharpness: 0.25
-    stationaryBlending: 0.95
-    motionBlending: 0.85
+    sharpness: 0.2
+    stationaryBlending: 0.9
+    motionBlending: 0.5
   subpixelMorphologicalAntialiasing:
     quality: 2
   fastApproximateAntialiasing:
@@ -196,8 +196,10 @@ GameObject:
   m_Component:
   - component: {fileID: 4652611953745217036}
   - component: {fileID: 1631844945}
+  - component: {fileID: 1811031946943815892}
   - component: {fileID: 4652611953745217039}
   - component: {fileID: 4652611953745217038}
+  - component: {fileID: 5257626327582716820}
   - component: {fileID: 4652611953745217136}
   m_Layer: 0
   m_Name: Player
@@ -234,21 +236,71 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b25fd5df3e37209489792dcd86b72fd7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  spawnPosition: {x: 0, y: 0, z: 0}
   Level: 1
   HealthPoints: 100
   HealthMultiplier: 1
-  isHostile: 0
-  isPlayer: 1
-  walkSpeed: 3
-  jumpForce: 1
-  mainPanel: {fileID: 0}
-  eqPanel: {fileID: 0}
-  craftPanel: {fileID: 0}
-  item: {fileID: 0}
-  eqButton: {fileID: 0}
-  craftButton: {fileID: 0}
-  blocks: 0000000000000000000000000000000000000000
-  isCreative: 0
+  healthText: {fileID: 0}
+  FlaskMask: {fileID: 0}
+  volume: {fileID: 4652611952530368327}
+  itemsBar:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  itemsEq:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  toolbar: {fileID: 0}
+  isAlive: 1
+--- !u!114 &1811031946943815892
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4652611953745217035}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e0547f8d7f578344b624ca448130ab9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ThirstPoints: 100
+  HungerPoints: 100
+  thirstText: {fileID: 0}
+  thirstMask: {fileID: 0}
+  hungerText: {fileID: 0}
+  hungerMask: {fileID: 0}
 --- !u!114 &4652611953745217039
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -263,10 +315,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cam: {fileID: 4652611952530368323}
   playmode: 0
+  focused: 1
   walkSpeed: 3
   rotationSpeed: 3
   pushForce: 2
-  jumpForce: 1
+  jumpForce: 1.5
   sprintSpeed: 5
   staminaReg: 0.2
   staminaDrain: 0.4
@@ -281,14 +334,28 @@ CharacterController:
   m_GameObject: {fileID: 4652611953745217035}
   m_Material: {fileID: 0}
   m_IsTrigger: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_Height: 1.75
   m_Radius: 0.4
-  m_SlopeLimit: 95
-  m_StepOffset: 0.15
+  m_SlopeLimit: 90
+  m_StepOffset: 0.23
   m_SkinWidth: 0.02
   m_MinMoveDistance: 0.0001
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!136 &5257626327582716820
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4652611953745217035}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  m_Radius: 0.35
+  m_Height: 1.75
+  m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!82 &4652611953745217136
 AudioSource:

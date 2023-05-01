@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Collections;
 using UnityEngine;
-
 [RequireComponent(typeof(MeshFilter))]
 [RequireComponent(typeof(MeshRenderer))]
 [RequireComponent(typeof(MeshCollider))]
@@ -20,113 +19,42 @@ public class Chunk : MonoBehaviour
         set { Cubes[x * chunkHeight * chunkWidth + y * chunkWidth + z] = value; }
     }
     public bool isDirty = false;
-    private Heightmap heightmap;
+    private Heightmap _heightmap;
     //COMPONENTS
-    private Material[] materials = new Material[3];
+    private Material[] materials = new Material[4];
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
     private MeshCollider _meshCollider;
-    private VoxelEngine _voxelEngine;
-    //GENERATING CHUNKS
-    private static readonly float cubeSize = 1f;
-    //TRIANGLES
-    private Vector3[] _c;
-    private Vector3[] _w;
-    private Vector3[] _cubeVertices;
-    private Vector3[] _waterVertices;
-    private static readonly int[] BottomQuad =
-        { 3, 1, 0, 3, 2, 1 };
-    private static readonly int[] LeftQuad =
-    {   7, 5, 4, 7, 6, 5  };
-    private static readonly int[] FrontQuad =
-    {  11, 9, 8, 11, 10, 9   };
-    private static readonly int[] BackQuad =
-    {      15, 13, 12, 15, 14, 13   };
-    private static readonly int[] RightQuad =
-    {19, 17, 16, 19, 18, 17    };
-    private static readonly int[] TopQuad =
-    {     23, 21, 20, 23, 22, 21    };
-    //NORMALS
-    private static readonly Vector3 up = Vector3.up;
-    private static readonly Vector3 down = Vector3.down;
-    private static readonly Vector3 forward = Vector3.forward;
-    private static readonly Vector3 back = Vector3.back;
-    private static readonly Vector3 left = Vector3.left;
-    private static readonly Vector3 right = Vector3.right;
-    private Vector3[] _cubeNormals;
-
-    void Awake()
+    private WorldController _worldController;
+    private ChunkUtilities chunkUtils;
+    public void SetVariables(Heightmap heightmap, WorldController worldController)
     {
-        _voxelEngine = GetComponentInParent<VoxelEngine>();
-        heightmap = _voxelEngine.world.Heightmaps[HeightmapId.FromWorldPos((int)transform.position.x, (int)transform.position.z)];
-        _c = new Vector3[]
-        {
-          new Vector3 (0, 0, cubeSize),
-          new Vector3 (cubeSize, 0, cubeSize),
-          new Vector3 (cubeSize, 0, 0),
-          new Vector3 (0, 0, 0),
-          new Vector3 (0, cubeSize, cubeSize),
-          new Vector3 (cubeSize, cubeSize, cubeSize),
-          new Vector3 (cubeSize, cubeSize, 0),
-          new Vector3 (0, cubeSize, 0),
-        };
-        _w = new Vector3[]
-        {
-          new Vector3 (0, 0, cubeSize),
-          new Vector3 (cubeSize, 0, cubeSize),
-          new Vector3 (cubeSize, 0, 0),
-          new Vector3 (0, 0, 0),
-          new Vector3 (0, cubeSize - 0.1f, cubeSize),
-          new Vector3 (cubeSize, cubeSize - 0.1f, cubeSize),
-          new Vector3 (cubeSize, cubeSize - 0.1f, 0),
-          new Vector3 (0, cubeSize - 0.1f, 0),
-        };
-        _waterVertices = new Vector3[]
-        {
-             _w[0], _w[1], _w[2], _w[3], // Bottom
-             _w[7], _w[4], _w[0], _w[3], // Left
-             _w[4], _w[5], _w[1], _w[0], // Front
-             _w[6], _w[7], _w[3], _w[2], // Back
-             _w[5], _w[6], _w[2], _w[1], // Right
-             _w[7], _w[6], _w[5], _w[4]  // Top
-        };
-        _cubeVertices = new Vector3[]
-        {
-             _c[0], _c[1], _c[2], _c[3], // Bottom
-             _c[7], _c[4], _c[0], _c[3], // Left
-             _c[4], _c[5], _c[1], _c[0], // Front
-             _c[6], _c[7], _c[3], _c[2], // Back
-             _c[5], _c[6], _c[2], _c[1], // Right
-             _c[7], _c[6], _c[5], _c[4]  // Top
-        };
-        _cubeNormals = new Vector3[]
-       {
-            down, down, down, down,             // Bottom
-	        left, left, left, left,             // Left
-	        forward, forward, forward, forward,	// Front
-	        back, back, back, back,             // Back
-	        right, right, right, right,         // Right
-	        up, up, up, up                      // Top
-       };
+        _worldController = worldController;
+        chunkUtils = _worldController.GetComponent<ChunkUtilities>();
+        _heightmap = heightmap;
     }
     private void Start()
     {
-        materials[0] = _voxelEngine.opaqueMat;
-        materials[1] = _voxelEngine.transparentMat;
-        materials[2] = _voxelEngine.waterMat;
+        materials[0] = _worldController.opaqueMaterial;
+        materials[1] = _worldController.transparentMaterial;
+        materials[2] = _worldController.waterMaterial;
+        materials[3] = _worldController.noCollisionMaterial;
         _meshFilter = GetComponent<MeshFilter>();
         _meshFilter.mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         _meshFilter.mesh.MarkDynamic();
         _meshRenderer = GetComponent<MeshRenderer>();
-        _meshCollider = GetComponent<MeshCollider>();
         _meshRenderer.materials = materials;
         _meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
+        _meshCollider = GetComponent<MeshCollider>();
         GetHeight();
     }
     private void Update()
     {
         if (isDirty)
+        {
+            isDirty = false;
             RenderToMesh();
+        }
     }
     private void GetHeight()
     {
@@ -138,187 +66,125 @@ public class Chunk : MonoBehaviour
             posX = (int)RoundUp(Mathf.Abs(posX), heightmapSize) + posX;
         if (posZ < 0)
             posZ = (int)RoundUp(Mathf.Abs(posZ), heightmapSize) + posZ;
-        Cubes = heightmap.ReturnCubes(posX % heightmapSize, posZ % heightmapSize);
-        _voxelEngine.world.SetChunkDirty(_posX, _posZ, true);
+        Cubes = _heightmap.ReturnCubes(posX % heightmapSize, posZ % heightmapSize);
+        _worldController.world.SetChunkDirty(_posX, _posZ, true);
     }
-    /*
-    private IEnumerator WaitForHeight()
-    {
-        int posX = (int)transform.position.x;
-        int _posX = posX;
-        int posZ = (int)transform.position.z;
-        int _posZ = posZ;
-        if (_voxelEngine.world.Heightmap.ContainsKey(HeightmapId.FromWorldPos(posX, posZ)))
-        {
-            Heightmap hm = _voxelEngine.world.Heightmap[HeightmapId.FromWorldPos(posX, posZ)];
-            if (hm.IsDone)
-            {
-                if (posX < 0)
-                    posX = (int)RoundUp(Mathf.Abs(posX), 128) + posX;
-                if (posZ < 0)
-                    posZ = (int)RoundUp(Mathf.Abs(posZ), 128) + posZ;
-                Cubes = hm.ReturnCubes(posX % 128, posZ % 128);
-                _voxelEngine.world.SetChunkDirty(_posX, _posZ, true);
-                //isDirty = true;
-            }
-            else
-            {
-                yield return new WaitForSeconds(1f);
-                StartCoroutine(WaitForHeight());
-            }
-
-        }
-        else
-        {
-            yield return new WaitForSeconds(1f);
-            StartCoroutine(WaitForHeight());
-        }
-    }*/
     private void RenderToMesh()
     {
-        isDirty = false;
         var vertices = new List<Vector3>();
         var opaqueTriangles = new List<int>();
         var waterTriangles = new List<int>();
         var transparentTriangles = new List<int>();
+        var noCollisionTriangles = new List<int>();
         var normals = new List<Vector3>();
         var uvs = new List<Vector2>();
         for (var x = 0; x < chunkWidth; x++)
         {
-            for (var y = 0; y < chunkHeight; y++)
+            for (var z = 0; z < chunkWidth; z++)
             {
-                for (var z = 0; z < chunkWidth; z++)
+                for (var y = 0; y < chunkHeight; y++)
                 {
                     var voxelType = this[x, y, z];
                     if (voxelType == (ushort)Blocks.Air)
                         continue;
-                    var _cubeTriangles = CalcTriangleFaces(x, y, z);
-                    if (_cubeTriangles.Count == 0)
-                        continue;
-                    var pos = new Vector3(x, y, z);
-                    var verticesPos = vertices.Count;
-                    if (voxelType == (ushort)Blocks.Water && this[x, y + 1, z] == (ushort)Blocks.Air)
+                    if (voxelType < 500)
                     {
-                        foreach (var vert in _waterVertices)
-                            vertices.Add(pos + vert);
-                    }
-                    else
-                    {
-                        foreach (var vert in _cubeVertices)
-                            vertices.Add(pos + vert);
-                    }
-                    foreach (var tri in _cubeTriangles)
-                    {
-                        if (voxelType == (ushort)Blocks.Water)
-                        { waterTriangles.Add(tri + verticesPos); }
-                        else if (voxelType == (ushort)Blocks.FancyLeaves || voxelType == (ushort)Blocks.Glass)
-                        { transparentTriangles.Add(tri + verticesPos); }
+                        //Cube blocks logic
+                        var _cubeTriangles = CalcTriangleFaces(x, y, z);
+                        if (_cubeTriangles.Count == 0)
+                            continue;
+                        bool waterVoxel = voxelType / 10 == (ushort)Blocks.WaterSource / 10;
+                        var pos = new Vector3(x, y, z);
+                        var verticesPos = vertices.Count;
+                        if (waterVoxel)
+                        {
+                            ushort end = (ushort)(voxelType % 10);
+                            foreach (var vert in ChunkUtilities.waterStates[end])
+                                vertices.Add(pos + vert);
+                        }
                         else
-                        { opaqueTriangles.Add(tri + verticesPos); }
+                        {
+                            foreach (var vert in ChunkUtilities._cubeVertices)
+                                vertices.Add(pos + vert);
+                        }
+                        foreach (var tri in _cubeTriangles)
+                        {
+                            if (waterVoxel)
+                            { waterTriangles.Add(tri + verticesPos); }
+                            else if (voxelType == (ushort)Blocks.Glass)
+                            { transparentTriangles.Add(tri + verticesPos); }
+                            else
+                            { opaqueTriangles.Add(tri + verticesPos); }
+                        }
+                        foreach (var normal in ChunkUtilities._cubeNormals)
+                            normals.Add(normal);
+                        Atlas.SetUV(voxelType, ref uvs);
                     }
-                    foreach (var normal in _cubeNormals)
-                        normals.Add(normal);
-                    switch (voxelType)
+                    else if (voxelType >= 500)
                     {
-                        //Grass
-                        case 1:
-                            foreach (var uv in Atlas.GetCustomUV(0, 0, 1))
-                                uvs.Add(uv);
-                            break;
-                        //Dirt 
-                        case 2:
-                            foreach (var uv in Atlas.GetUV(32, 32))
-                                uvs.Add(uv);
-                            break;
-                        //Stone 
-                        case 3:
-                            foreach (var uv in Atlas.GetUV(0, 16))
-                                uvs.Add(uv);
-                            break;
-                        //Sand 
-                        case 4:
-                            foreach (var uv in Atlas.GetUV(16, 16))
-                                uvs.Add(uv);
-                            break;
-                        //WoodenLog 
-                        case 5:
-                            foreach (var uv in Atlas.GetCustomUV(32, 16, 2))
-                                uvs.Add(uv);
-                            break;
-                        //Leaves 
-                        case 6:
-                            foreach (var uv in Atlas.GetUV(32, 0))
-                                uvs.Add(uv);
-                            break;
-                        //Water 
-                        case 7:
-                            foreach (var uv in Atlas.GetUV(0, 64))
-                                uvs.Add(uv);
-                            break;
-                        //Cobblestone
-                        case 8:
-                            foreach (var uv in Atlas.GetUV(48, 0))
-                                uvs.Add(uv);
-                            break;
-                        //Planks
-                        case 9:
-                            foreach (var uv in Atlas.GetUV(16, 32))
-                                uvs.Add(uv);
-                            break;
-                        //Clay
-                        case 10:
-                            foreach (var uv in Atlas.GetUV(48, 16))
-                                uvs.Add(uv);
-                            break;
-                        //Bricks
-                        case 11:
-                            foreach (var uv in Atlas.GetUV(48, 32))
-                                uvs.Add(uv);
-                            break;
-                        //FancyLeaves
-                        case 12:
-                            foreach (var uv in Atlas.GetUV(64, 64))
-                                uvs.Add(uv);
-                            break;
-                        //Glass
-                        case 13:
-                            foreach (var uv in Atlas.GetUV(32, 64))
-                                uvs.Add(uv);
-                            break;
-                        //Coal ore
-                        case 14:
-                            foreach (var uv in Atlas.GetUV(64, 0))
-                                uvs.Add(uv);
-                            break;
-                        //Iron ore
-                        case 15:
-                            foreach (var uv in Atlas.GetUV(64, 16))
-                                uvs.Add(uv);
-                            break;
-                        //Workbench
-                        case 16:
-                            foreach (var uv in Atlas.GetCustomUV(80, 16, 3))
-                                uvs.Add(uv);
-                            break;
-                        //Furnace
-                        case 17:
-                            foreach (var uv in Atlas.GetCustomUV(80, 32, 4))
-                                uvs.Add(uv);
-                            break;
-                        //Dirt
-                        default:
-                            foreach (var uv in Atlas.GetUV(32, 32))
-                                uvs.Add(uv);
-                            break;
+                        //custom mesh blocks (stairs, bushes etc.) 
+                        Mesh _mesh;
+                        Vector3 pos;
+                        Quaternion qAngle;
+                        var verticesPos = vertices.Count;        
+                        switch (voxelType / 10)
+                        {
+                            case 50: //Stone Stairs
+                            case 51: //Cobble Stairs
+                                float angle = 90f * (voxelType % 10);
+                                pos = angle switch
+                                {
+                                    90f => new Vector3(x + 1, y, z),
+                                    180f => new Vector3(x, y, z),
+                                    270f => new Vector3(x, y, z + 1),
+                                    _ => new Vector3(x + 1, y, z + 1),
+                                };
+                                qAngle = Quaternion.AngleAxis(angle, Vector3.up);
+                                _mesh = chunkUtils.customBlocks[(voxelType / 10) - 50].GetComponent<MeshFilter>().sharedMesh;
+                                for (int i = 0; i < _mesh.vertices.Length; i++)
+                                {
+                                    vertices.Add(pos + qAngle * _mesh.vertices[i]);
+                                }
+                                foreach (var tri in _mesh.triangles)
+                                {
+                                    opaqueTriangles.Add(tri + verticesPos);
+                                }
+                                normals.AddRange(_mesh.normals);
+                                uvs.AddRange(_mesh.uv);
+                                break;
+                            case 100: //grass bush
+                            case 101: //short bush
+                            case 102: //fruit bush
+                            case 103: //flower1
+                            case 104: //flower2
+                            case 105: //flower3
+                                pos = new Vector3(x + 1, y, z);
+                                qAngle = Quaternion.AngleAxis(-90f, Vector3.right);
+                                _mesh = chunkUtils.customBlocks[(voxelType / 10) - 98].GetComponent<MeshFilter>().sharedMesh;
+                                for (int i = 0; i < _mesh.vertices.Length; i++)
+                                {
+                                    vertices.Add(pos + qAngle * _mesh.vertices[i]);
+                                }
+                                foreach (var tri in _mesh.triangles)
+                                {
+                                    noCollisionTriangles.Add(tri + verticesPos);
+                                }
+                                normals.AddRange(_mesh.normals);
+                                uvs.AddRange(_mesh.uv);
+                                break;
+                            default:
+                                break;
+                        }
                     }
                 }
             }
         }
         Mesh mesh = _meshFilter.mesh;
+        mesh.Clear();
         Mesh collisionMesh = new();
         collisionMesh.MarkDynamic();
         collisionMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-        mesh.subMeshCount = 3;
+        mesh.subMeshCount = 4;
         mesh.SetVertices(vertices);
         mesh.SetTriangles(opaqueTriangles, 0);
         collisionMesh.subMeshCount = 2;
@@ -333,97 +199,90 @@ public class Chunk : MonoBehaviour
         {
             mesh.SetTriangles(waterTriangles, 2);
         }
-        mesh.RecalculateNormals();
+        if (noCollisionTriangles.Count > 0)
+        {
+            mesh.SetTriangles(noCollisionTriangles, 3);
+        }
         mesh.SetUVs(0, uvs);
         mesh.SetNormals(normals);
         mesh.Optimize();
+        mesh.RecalculateNormals();
         collisionMesh.Optimize();
         _meshCollider.sharedMesh = collisionMesh;
     }
     private void AddRange(ref List<int> triangles, ushort _this, ushort other, string quad)
     {
-        if (other == 0 || other == 7 || other == 12 || other == 13)
+        var endThis = _this % 10;
+        var endOther = other % 10;
+
+        _this /= 10;
+        other /= 10;
+
+        //0 - air, 7 water, 12 glass, 17/18 stairs, 19-24 bushes
+        if (other == 0 || other == 7 || other == 12 || other >= 50)
         {
             //water
             if (_this == 7)
             {
-                if (other == 0 || other == 12 || other == 13)
+                switch (quad)
                 {
-                    switch (quad)
-                    {
-                        case "Bottom":
-                            triangles.AddRange(BottomQuad);
-                            break;
-                        case "Top":
-                            triangles.AddRange(TopQuad);
-                            break;
-                        case "Left":
-                            triangles.AddRange(LeftQuad);
-                            break;
-                        case "Right":
-                            triangles.AddRange(RightQuad);
-                            break;
-                        case "Back":
-                            triangles.AddRange(BackQuad);
-                            break;
-                        case "Front":
-                            triangles.AddRange(FrontQuad);
-                            break;
-                    }
-                }
-            }
-            //leaves
-            else if (_this == 12)
-            {
-                if (other == 0 || other == 7 || other == 12 || other == 13)
-                {
-                    switch (quad)
-                    {
-                        case "Bottom":
-                            triangles.AddRange(BottomQuad);
-                            break;
-                        case "Top":
-                            triangles.AddRange(TopQuad);
-                            break;
-                        case "Left":
-                            triangles.AddRange(LeftQuad);
-                            break;
-                        case "Right":
-                            triangles.AddRange(RightQuad);
-                            break;
-                        case "Back":
-                            triangles.AddRange(BackQuad);
-                            break;
-                        case "Front":
-                            triangles.AddRange(FrontQuad);
-                            break;
-                    }
+                    case "Bottom":
+                        if (other != 7)
+                            triangles.AddRange(ChunkUtilities.BottomQuad);
+                        break;
+                    case "Top":
+                        if (other != 7)
+                        {
+                            triangles.AddRange(ChunkUtilities.TopQuad);
+                            if (other == 0)
+                            {
+                                triangles.AddRange(ChunkUtilities.BottomQuad);
+                            }
+                        }
+
+                        break;
+                    case "Left":
+                        if (other != 7 || (other == 7 && endOther < endThis && endThis != 0) || (other == 7 && endThis == 0 && endThis != endOther))
+                            triangles.AddRange(ChunkUtilities.LeftQuad);
+                        break;
+                    case "Right":
+                        if (other != 7 || (other == 7 && endOther < endThis && endThis != 0) || (other == 7 && endThis == 0 && endThis != endOther))
+                            triangles.AddRange(ChunkUtilities.RightQuad);
+                        break;
+                    case "Back":
+                        if (other != 7 || (other == 7 && endOther < endThis && endThis != 0) || (other == 7 && endThis == 0 && endThis != endOther))
+                            triangles.AddRange(ChunkUtilities.BackQuad);
+                        break;
+                    case "Front":
+                        if (other != 7 || (other == 7 && endOther < endThis && endThis != 0) || (other == 7 && endThis == 0 && endThis != endOther))
+                            triangles.AddRange(ChunkUtilities.FrontQuad);
+                        break;
                 }
             }
             //glass
-            else if (_this == 13)
+            else if (_this == 12)
             {
-                if (other == 0 || other == 7 || other == 12)
+                if (other == 0 || other == 7 || other >= 50)
                 {
                     switch (quad)
                     {
                         case "Bottom":
-                            triangles.AddRange(BottomQuad);
+                            triangles.AddRange(ChunkUtilities.BottomQuad);
                             break;
                         case "Top":
-                            triangles.AddRange(TopQuad);
+                            triangles.AddRange(ChunkUtilities.TopQuad);
                             break;
                         case "Left":
-                            triangles.AddRange(LeftQuad);
+                            triangles.AddRange(ChunkUtilities.LeftQuad);
                             break;
                         case "Right":
-                            triangles.AddRange(RightQuad);
+                            triangles.AddRange(ChunkUtilities.RightQuad);
                             break;
                         case "Back":
-                            triangles.AddRange(BackQuad);
+                            triangles.AddRange(ChunkUtilities.BackQuad);
                             break;
                         case "Front":
-                            triangles.AddRange(FrontQuad);
+                            triangles.AddRange(ChunkUtilities.FrontQuad);
                             break;
                     }
                 }
@@ -433,22 +292,22 @@ public class Chunk : MonoBehaviour
                 switch (quad)
                 {
                     case "Bottom":
-                        triangles.AddRange(BottomQuad);
+                        triangles.AddRange(ChunkUtilities.BottomQuad);
                         break;
                     case "Top":
-                        triangles.AddRange(TopQuad);
+                        triangles.AddRange(ChunkUtilities.TopQuad);
                         break;
                     case "Left":
-                        triangles.AddRange(LeftQuad);
+                        triangles.AddRange(ChunkUtilities.LeftQuad);
                         break;
                     case "Right":
-                        triangles.AddRange(RightQuad);
+                        triangles.AddRange(ChunkUtilities.RightQuad);
                         break;
                     case "Back":
-                        triangles.AddRange(BackQuad);
+                        triangles.AddRange(ChunkUtilities.BackQuad);
                         break;
                     case "Front":
-                        triangles.AddRange(FrontQuad);
+                        triangles.AddRange(ChunkUtilities.FrontQuad);
                         break;
                 }
             }
@@ -463,8 +322,9 @@ public class Chunk : MonoBehaviour
             ushort below = this[x, y - 1, z];
             AddRange(ref triangles, this[x, y, z], below, "Bottom");
         }
+        /*
         else
-        { triangles.AddRange(BottomQuad); }
+        {  triangles.AddRange(ChunkUtilities.BottomQuad); }*/
 
         //Top
         if (y < chunkHeight - 1)
@@ -473,7 +333,7 @@ public class Chunk : MonoBehaviour
             AddRange(ref triangles, this[x, y, z], above, "Top");
         }
         else
-        { triangles.AddRange(TopQuad); }
+        { triangles.AddRange(ChunkUtilities.TopQuad); }
 
         //Left
         if (x > 0)
@@ -483,7 +343,7 @@ public class Chunk : MonoBehaviour
         }
         else
         {
-            ushort value = _voxelEngine.world[(int)transform.position.x - 1, y, (int)transform.position.z + z];
+            ushort value = _worldController.world[(int)transform.position.x - 1, y, (int)transform.position.z + z];
             AddRange(ref triangles, this[x, y, z], value, "Left");
         }
 
@@ -495,7 +355,7 @@ public class Chunk : MonoBehaviour
         }
         else
         {
-            ushort value = _voxelEngine.world[(int)transform.position.x + chunkWidth, y, (int)transform.position.z + z];
+            ushort value = _worldController.world[(int)transform.position.x + chunkWidth, y, (int)transform.position.z + z];
             AddRange(ref triangles, this[x, y, z], value, "Right");
         }
 
@@ -507,7 +367,7 @@ public class Chunk : MonoBehaviour
         }
         else
         {
-            ushort value = _voxelEngine.world[(int)transform.position.x + x, y, (int)transform.position.z - 1];
+            ushort value = _worldController.world[(int)transform.position.x + x, y, (int)transform.position.z - 1];
             AddRange(ref triangles, this[x, y, z], value, "Back");
         }
 
@@ -519,7 +379,7 @@ public class Chunk : MonoBehaviour
         }
         else
         {
-            ushort value = _voxelEngine.world[(int)transform.position.x + x, y, (int)transform.position.z + chunkWidth];
+            ushort value = _worldController.world[(int)transform.position.x + x, y, (int)transform.position.z + chunkWidth];
             AddRange(ref triangles, this[x, y, z], value, "Front");
         }
 
