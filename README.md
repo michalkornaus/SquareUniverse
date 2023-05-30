@@ -7,4 +7,8 @@ Unity C# Voxel Game
 ![screenshot4](/Screens/4.PNG)
 ![screenshot5](/Screens/5.PNG)
 ![screenshot6](/Screens/6.PNG)
+![screenshot6](/Screens/7.PNG)
+![screenshot6](/Screens/8.PNG)
+![screenshot6](/Screens/9.PNG)
+![screenshot6](/Screens/10.PNG)
 
